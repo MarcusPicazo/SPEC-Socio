@@ -22,8 +22,13 @@ import {
   toQuoteItems,
   type ResolvedQuoteItem,
 } from './quote-helpers.ts'
-import { sendFreeText, sendInteractiveList } from './whatsapp.ts'
+import { sendDocument, sendFreeText, sendInteractiveButtons, sendInteractiveList } from './whatsapp.ts'
 import type { Business, QuoteExtraction, QuoteExtractionItem, QuoteItem } from './types.ts'
+
+// Shared with whatsapp-webhook/index.ts, which parses these back out of
+// the button tap — defined once here so sender and parser can't drift.
+export const SEND_QUOTE_BUTTON_PREFIX = 'send_quote:'
+export const CORRECT_QUOTE_BUTTON_PREFIX = 'correct_quote:'
 
 type DraftStatus =
   | 'awaiting_customer'
@@ -508,6 +513,7 @@ async function finalizeQuote(
       type: 'quote.updated',
       payload: { quote_id: draft.promoted_quote_id, number: existingQuote.number },
     })
+    await generateAndSendPdf(admin, business, draft.promoted_quote_id, existingQuote.number, replyTo)
     return
   }
 
@@ -544,6 +550,74 @@ async function finalizeQuote(
     business_id: business.id,
     type: 'quote.draft_created',
     payload: { quote_id: newQuote.id, number: newQuote.number },
+  })
+  await generateAndSendPdf(admin, business, newQuote.id, newQuote.number, replyTo)
+}
+
+/**
+ * Calls the Vercel PDF function and, on success, sends it to the owner as
+ * a WhatsApp document followed by Enviar/Corregir buttons. Not fatal if it
+ * fails — the Spanish text preview already went out, so the owner isn't
+ * left with nothing; the failure is only logged.
+ */
+async function generateAndSendPdf(
+  admin: SupabaseClient,
+  business: Business,
+  quoteId: string,
+  quoteNumber: string,
+  replyTo: string,
+): Promise<void> {
+  const appBaseUrl = Deno.env.get('APP_BASE_URL')
+  const sharedSecret = Deno.env.get('QUOTE_PDF_SHARED_SECRET')
+  if (!appBaseUrl || !sharedSecret) {
+    console.error('Faltan APP_BASE_URL o QUOTE_PDF_SHARED_SECRET — no se generó el PDF.')
+    return
+  }
+
+  let pdfUrl: string
+  try {
+    const response = await fetch(`${appBaseUrl}/api/quote-pdf`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sharedSecret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quote_id: quoteId }),
+    })
+    const text = await response.text()
+    if (!response.ok) throw new Error(`quote-pdf ${response.status}: ${text}`)
+    const data = JSON.parse(text) as { pdf_url?: string }
+    if (!data.pdf_url) throw new Error('quote-pdf no devolvió pdf_url.')
+    pdfUrl = data.pdf_url
+  } catch (error) {
+    console.error('No se pudo generar el PDF', error)
+    await admin.from('events').insert({
+      business_id: business.id,
+      type: 'quote.pdf_failed',
+      payload: { quote_id: quoteId, error: error instanceof Error ? error.message : String(error) },
+    })
+    return
+  }
+
+  await sendDocument(admin, {
+    businessId: business.id,
+    to: replyTo,
+    link: pdfUrl,
+    filename: `${quoteNumber}.pdf`,
+    caption: `Cotización ${quoteNumber}`,
+  })
+
+  await sendInteractiveButtons(admin, {
+    businessId: business.id,
+    to: replyTo,
+    bodyText: '¿Qué quieres hacer con esta cotización?',
+    buttons: [
+      { id: `${SEND_QUOTE_BUTTON_PREFIX}${quoteId}`, title: 'Enviar' },
+      { id: `${CORRECT_QUOTE_BUTTON_PREFIX}${quoteId}`, title: 'Corregir' },
+    ],
+  })
+
+  await admin.from('events').insert({
+    business_id: business.id,
+    type: 'quote.pdf_sent',
+    payload: { quote_id: quoteId },
   })
 }
 

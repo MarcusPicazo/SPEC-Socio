@@ -36,3 +36,11 @@ export function formatDateTime(value: string | null): string {
 export function formatMoney(value: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value)
 }
+
+const dateEnFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' })
+
+/** English, date-only — for customer-facing pages like /q/:token. */
+export function formatDateEn(value: string | null): string {
+  if (!value) return '—'
+  return dateEnFormatter.format(new Date(value))
+}

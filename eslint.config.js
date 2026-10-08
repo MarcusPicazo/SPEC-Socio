@@ -13,6 +13,7 @@ export default [
   js.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
+    ignores: ['api/**'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -31,6 +32,25 @@ export default [
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': 'warn',
+    },
+  },
+  {
+    // api/ is a Vercel Node.js function, not browser code.
+    files: ['api/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true },
+      },
+      globals: globals.node,
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      ...tseslint.configs.recommended.rules,
     },
   },
 ]
