@@ -1,5 +1,10 @@
 import { assertEquals } from 'jsr:@std/assert@1'
-import { extractButtonAction, parseInboundMessages } from './whatsapp-inbound.ts'
+import {
+  extractButtonAction,
+  extractListReplyAction,
+  parseInboundMessages,
+  type InboundMessage,
+} from './whatsapp-inbound.ts'
 
 function envelope(messages: unknown[]): unknown {
   return {
@@ -10,6 +15,25 @@ function envelope(messages: unknown[]): unknown {
         changes: [{ value: { messaging_product: 'whatsapp', messages }, field: 'messages' }],
       },
     ],
+  }
+}
+
+function baseMessage(overrides: Partial<InboundMessage>): InboundMessage {
+  return {
+    id: 'x',
+    from: 'y',
+    type: 'text',
+    timestamp: null,
+    textBody: null,
+    buttonPayload: null,
+    buttonTitle: null,
+    interactiveButtonReplyId: null,
+    interactiveButtonReplyTitle: null,
+    listReplyId: null,
+    listReplyTitle: null,
+    audioId: null,
+    audioMimeType: null,
+    ...overrides,
   }
 }
 
@@ -26,17 +50,16 @@ Deno.test('parses a free text message', () => {
     ]),
   )
   assertEquals(result.length, 1)
-  assertEquals(result[0], {
-    id: 'wamid.ABC',
-    from: '17135550100',
-    type: 'text',
-    timestamp: '1700000000',
-    textBody: 'Hola',
-    buttonPayload: null,
-    buttonTitle: null,
-    interactiveButtonReplyId: null,
-    interactiveButtonReplyTitle: null,
-  })
+  assertEquals(
+    result[0],
+    baseMessage({
+      id: 'wamid.ABC',
+      from: '17135550100',
+      type: 'text',
+      timestamp: '1700000000',
+      textBody: 'Hola',
+    }),
+  )
 })
 
 Deno.test('parses a free-form interactive button reply', () => {
@@ -70,6 +93,39 @@ Deno.test('parses a template quick-reply button (Direct Send shape)', () => {
   )
   assertEquals(result[0]?.buttonPayload, 'owner_call:call-123')
   assertEquals(result[0]?.buttonTitle, 'Lo llamo yo')
+})
+
+Deno.test('parses an interactive list reply', () => {
+  const result = parseInboundMessages(
+    envelope([
+      {
+        from: '17135550100',
+        id: 'wamid.LIST',
+        type: 'interactive',
+        interactive: {
+          type: 'list_reply',
+          list_reply: { id: 'customer:abc-123', title: 'Sarah Miller', description: '' },
+        },
+      },
+    ]),
+  )
+  assertEquals(result[0]?.listReplyId, 'customer:abc-123')
+  assertEquals(result[0]?.listReplyTitle, 'Sarah Miller')
+})
+
+Deno.test('parses an inbound voice note', () => {
+  const result = parseInboundMessages(
+    envelope([
+      {
+        from: '17135550100',
+        id: 'wamid.AUDIO',
+        type: 'audio',
+        audio: { id: 'media-abc', mime_type: 'audio/ogg; codecs=opus', voice: true },
+      },
+    ]),
+  )
+  assertEquals(result[0]?.audioId, 'media-abc')
+  assertEquals(result[0]?.audioMimeType, 'audio/ogg; codecs=opus')
 })
 
 Deno.test('collects messages across multiple entries and changes', () => {
@@ -109,46 +165,37 @@ Deno.test('returns an empty array for a malformed or empty payload', () => {
 })
 
 Deno.test('extractButtonAction prefers the interactive shape when both are somehow present', () => {
-  const action = extractButtonAction({
-    id: 'x',
-    from: 'y',
-    type: 'interactive',
-    timestamp: null,
-    textBody: null,
-    buttonPayload: 'owner_call:1',
-    buttonTitle: 'Lo llamo yo',
-    interactiveButtonReplyId: 'confirm:1',
-    interactiveButtonReplyTitle: 'Confirmar cita',
-  })
+  const action = extractButtonAction(
+    baseMessage({
+      type: 'interactive',
+      buttonPayload: 'owner_call:1',
+      buttonTitle: 'Lo llamo yo',
+      interactiveButtonReplyId: 'confirm:1',
+      interactiveButtonReplyTitle: 'Confirmar cita',
+    }),
+  )
   assertEquals(action, { payload: 'confirm:1', title: 'Confirmar cita' })
 })
 
 Deno.test('extractButtonAction falls back to the template button shape', () => {
-  const action = extractButtonAction({
-    id: 'x',
-    from: 'y',
-    type: 'button',
-    timestamp: null,
-    textBody: null,
-    buttonPayload: 'owner_call:1',
-    buttonTitle: 'Lo llamo yo',
-    interactiveButtonReplyId: null,
-    interactiveButtonReplyTitle: null,
-  })
+  const action = extractButtonAction(
+    baseMessage({ type: 'button', buttonPayload: 'owner_call:1', buttonTitle: 'Lo llamo yo' }),
+  )
   assertEquals(action, { payload: 'owner_call:1', title: 'Lo llamo yo' })
 })
 
 Deno.test('extractButtonAction returns null for a plain text message', () => {
-  const action = extractButtonAction({
-    id: 'x',
-    from: 'y',
-    type: 'text',
-    timestamp: null,
-    textBody: 'hola',
-    buttonPayload: null,
-    buttonTitle: null,
-    interactiveButtonReplyId: null,
-    interactiveButtonReplyTitle: null,
-  })
+  const action = extractButtonAction(baseMessage({ type: 'text', textBody: 'hola' }))
   assertEquals(action, null)
+})
+
+Deno.test('extractListReplyAction returns the row id and title', () => {
+  const action = extractListReplyAction(
+    baseMessage({ type: 'interactive', listReplyId: 'customer:abc', listReplyTitle: 'Sarah' }),
+  )
+  assertEquals(action, { id: 'customer:abc', title: 'Sarah' })
+})
+
+Deno.test('extractListReplyAction returns null for a non-list message', () => {
+  assertEquals(extractListReplyAction(baseMessage({ type: 'text', textBody: 'hola' })), null)
 })
