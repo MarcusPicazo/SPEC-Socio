@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getBusiness } from '../lib/businesses'
+import { getBusiness, provisionBusiness } from '../lib/businesses'
 import { listRecentCallsForBusiness, type CallWithCustomer } from '../lib/calls'
 import {
   CALL_STATUS_LABELS,
@@ -20,6 +20,8 @@ export function BusinessDetailPage() {
   const [quotes, setQuotes] = useState<QuoteWithCustomer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [provisioning, setProvisioning] = useState(false)
+  const [provisionError, setProvisionError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -51,6 +53,21 @@ export function BusinessDetailPage() {
   if (loading) return <div className="p-6 text-gray-500">Cargando…</div>
   if (error) return <div className="p-6 text-red-600">{error}</div>
   if (!business) return null
+
+  async function handleActivateLine(businessId: string) {
+    setProvisioning(true)
+    setProvisionError(null)
+    try {
+      const result = await provisionBusiness(businessId)
+      setBusiness((current) =>
+        current ? { ...current, vapi_assistant_id: result.vapi_assistant_id } : current,
+      )
+    } catch (err) {
+      setProvisionError(err instanceof Error ? err.message : 'No se pudo activar la línea.')
+    } finally {
+      setProvisioning(false)
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
@@ -85,6 +102,31 @@ export function BusinessDetailPage() {
           <dt className="text-gray-400">Transferencia de emergencias</dt>
           <dd className="text-gray-700">{business.emergency_transfer ? 'Sí' : 'No'}</dd>
         </dl>
+      </section>
+
+      <section className="rounded border border-gray-200 bg-white p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Línea de voz (Vapi)
+        </h2>
+        <p className="text-sm text-gray-600">
+          {business.vapi_assistant_id
+            ? `Activada · asistente ${business.vapi_assistant_id}`
+            : 'Todavía no se ha activado.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => handleActivateLine(business.id)}
+          disabled={provisioning || !business.twilio_number}
+          className="mt-3 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          {provisioning ? 'Activando…' : business.vapi_assistant_id ? 'Reactivar línea' : 'Activar línea'}
+        </button>
+        {!business.twilio_number && (
+          <p className="mt-2 text-xs text-gray-500">
+            Asigna primero un número de Twilio desde Editar.
+          </p>
+        )}
+        {provisionError && <p className="mt-2 text-sm text-red-600">{provisionError}</p>}
       </section>
 
       <section className="rounded border border-gray-200 bg-white p-4">
