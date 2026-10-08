@@ -62,7 +62,12 @@ export interface Customer {
   created_at: string
 }
 
-/** SPEC §6.2 — structured extraction from an inbound call. */
+/**
+ * SPEC §6.2 — structured extraction from an inbound call, produced by
+ * Vapi's analysisPlan.structuredDataPlan. summary_es is NOT part of this —
+ * it's generated separately by voice-webhook's own Claude Haiku call and
+ * stored in Call.summary_es, its own column.
+ */
 export interface CallExtraction {
   caller_name: string | null
   callback_number: string | null
@@ -73,7 +78,6 @@ export interface CallExtraction {
   preferred_time: string | null
   language: Language
   is_spam: boolean
-  summary_es: string
 }
 
 export interface Call {
