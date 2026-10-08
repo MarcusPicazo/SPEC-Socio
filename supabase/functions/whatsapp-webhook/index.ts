@@ -9,10 +9,12 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
 import { verifyMetaSignature } from '../_shared/meta-signature.ts'
 import {
+  CORRECT_QUOTE_BUTTON_PREFIX,
   getActiveDraft,
   handleDraftListReply,
   handleDraftTextReply,
   handleIncomingVoiceNote,
+  SEND_QUOTE_BUTTON_PREFIX,
 } from '../_shared/quote-drafts.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
@@ -191,6 +193,25 @@ async function processInboundMessage(admin: SupabaseClient, message: InboundMess
       buttonAction.payload.slice(OWNER_CALL_PREFIX.length),
       fromE164,
     )
+    return
+  }
+  if (buttonAction?.payload.startsWith(CORRECT_QUOTE_BUTTON_PREFIX)) {
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: fromE164,
+      body: 'Manda una nota de voz diciendo qué corregir — por ejemplo: "corrige el precio a 9,800 dólares."',
+    })
+    return
+  }
+  if (buttonAction?.payload.startsWith(SEND_QUOTE_BUTTON_PREFIX)) {
+    // The actual send-to-customer flow (Resend email, status->sent) isn't
+    // built yet — that's its own, separate task. Still worth a real reply
+    // instead of falling through to the generic menu.
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: fromE164,
+      body: 'Todavía no puedo enviarla al cliente desde aquí — esa parte llega muy pronto. Por ahora puedes compartirle el PDF tú mismo.',
+    })
     return
   }
 
