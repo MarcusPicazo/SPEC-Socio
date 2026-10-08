@@ -16,6 +16,7 @@ export const CALL_STATUS_LABELS: Record<CallStatus, string> = {
 
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   draft: 'Borrador',
+  sending: 'Enviando…',
   sent: 'Enviada',
   viewed: 'Vista',
   accepted: 'Aceptada',

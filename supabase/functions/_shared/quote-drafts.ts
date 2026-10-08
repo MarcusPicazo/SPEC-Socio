@@ -284,9 +284,19 @@ export async function handleDraftTextReply(
   }
 
   if (draft.status === 'awaiting_customer_email') {
+    const email = text.trim()
+    if (!isLikelyEmail(email)) {
+      await sendFreeText(admin, {
+        businessId: business.id,
+        to: replyTo,
+        body: 'Ese correo no se ve válido 😕 ¿Puedes mandarlo otra vez?',
+      })
+      return
+    }
+
     const { data: newCustomer, error } = await admin
       .from('customers')
-      .insert({ business_id: business.id, name: draft.pending_customer_name, email: text })
+      .insert({ business_id: business.id, name: draft.pending_customer_name, email })
       .select('id')
       .single()
     if (error) throw error
@@ -440,7 +450,14 @@ async function handleSendEmailReply(
   await sendQuoteToCustomer(admin, business, quote as Quote, { name: customerName, email }, replyTo)
 }
 
-/** Sends the quote email, marks it `sent`, logs it, and confirms to the owner. Not fatal to fail — the owner is told and the quote stays `draft` so Enviar can be retried. */
+/**
+ * Sends the quote email, marks it `sent`, logs it, and confirms to the
+ * owner. Claims the quote ('draft' -> 'sending', conditioned on it still
+ * being 'draft') before doing anything else — a double tap on "Enviar"
+ * calls this twice in quick succession, and only the request whose update
+ * actually affects a row wins; the other sees 0 rows updated and returns.
+ * Any failure after claiming reverts to 'draft' so Enviar can be retried.
+ */
 async function sendQuoteToCustomer(
   admin: SupabaseClient,
   business: Business,
@@ -448,9 +465,23 @@ async function sendQuoteToCustomer(
   customer: { name: string | null; email: string },
   replyTo: string,
 ): Promise<void> {
+  const { data: claimed, error: claimError } = await admin
+    .from('quotes')
+    .update({ status: 'sending' })
+    .eq('id', quote.id)
+    .eq('status', 'draft')
+    .select('id')
+  if (claimError) throw claimError
+  if (!claimed || claimed.length === 0) {
+    // Someone else is already sending this one (or it's no longer a
+    // draft) — don't send it a second time.
+    return
+  }
+
   const appBaseUrl = Deno.env.get('APP_BASE_URL')
   if (!appBaseUrl) {
     console.error('Falta APP_BASE_URL — no se pudo mandar el correo de la cotización.')
+    await admin.from('quotes').update({ status: 'draft' }).eq('id', quote.id)
     await sendFreeText(admin, {
       businessId: business.id,
       to: replyTo,
@@ -483,6 +514,7 @@ async function sendQuoteToCustomer(
 
   if (!emailResult.success) {
     console.error('No se pudo mandar el correo de la cotización', emailResult.error)
+    await admin.from('quotes').update({ status: 'draft' }).eq('id', quote.id)
     await admin.from('events').insert({
       business_id: business.id,
       type: 'quote.email_failed',

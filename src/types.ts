@@ -8,7 +8,7 @@ export type Language = 'en' | 'es'
 
 export type CallStatus = 'new' | 'confirmed' | 'owner_will_call' | 'ignored'
 
-export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired'
+export type QuoteStatus = 'draft' | 'sending' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired'
 
 export type MessageDirection = 'inbound' | 'outbound'
 

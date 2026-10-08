@@ -17,6 +17,7 @@ import { normalizeCallExtraction } from '../_shared/call-extraction.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import { fillTemplate } from '../_shared/template.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
+import { isUniqueViolation } from '../_shared/postgrest-errors.ts'
 import { extractCallFields, type ExtractedCallFields } from '../_shared/vapi-report.ts'
 import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
 import { NUEVA_LLAMADA_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
@@ -247,15 +248,6 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'El payload no trae un id de llamada.' }, 400)
   }
 
-  const { data: existingCall } = await admin
-    .from('calls')
-    .select('id')
-    .eq('provider_call_id', fields.callId)
-    .maybeSingle()
-  if (existingCall) {
-    return jsonResponse({ ok: true, duplicate: true }, 200)
-  }
-
   const business = await findBusiness(admin, fields)
   if (!business) {
     await admin.from('events').insert({
@@ -283,32 +275,48 @@ Deno.serve(async (req: Request) => {
   }
 
   const extraction = normalizeCallExtraction(fields.structuredData)
+
+  // Claim the call row FIRST, with a plain insert — two concurrent
+  // deliveries of the same provider_call_id (Vapi can redeliver) could
+  // otherwise both pass a "does it exist?" select before either writes,
+  // and both notify the owner. Whichever insert actually lands wins the
+  // race; the loser hits provider_call_id's unique constraint and stops
+  // here, instead of a duplicate WhatsApp.
+  const { data: claimedCall, error: claimError } = await admin
+    .from('calls')
+    .insert({
+      business_id: business.id,
+      customer_id: null,
+      provider_call_id: fields.callId,
+      from_number: fields.customerNumber,
+      started_at: fields.startedAt,
+      duration_sec: fields.durationSec,
+      recording_url: fields.recordingUrl,
+      transcript: fields.transcript,
+      extracted: extraction,
+      summary_es: null,
+      is_spam: extraction.is_spam,
+      status: extraction.is_spam ? 'ignored' : 'new',
+    })
+    .select('id')
+    .single()
+
+  if (claimError) {
+    if (isUniqueViolation(claimError)) return jsonResponse({ ok: true, duplicate: true }, 200)
+    throw claimError
+  }
+
   const customerId = await findOrCreateCustomer(
     admin,
     business.id,
     fields.customerNumber,
     extraction,
   )
-
-  const baseCallRow = {
-    business_id: business.id,
-    customer_id: customerId,
-    provider_call_id: fields.callId,
-    from_number: fields.customerNumber,
-    started_at: fields.startedAt,
-    duration_sec: fields.durationSec,
-    recording_url: fields.recordingUrl,
-    transcript: fields.transcript,
-    extracted: extraction,
+  if (customerId) {
+    await admin.from('calls').update({ customer_id: customerId }).eq('id', claimedCall.id)
   }
 
   if (extraction.is_spam) {
-    const { error: insertError } = await admin.from('calls').upsert(
-      { ...baseCallRow, summary_es: null, is_spam: true, status: 'ignored' },
-      { onConflict: 'provider_call_id', ignoreDuplicates: true },
-    )
-    if (insertError) throw insertError
-
     await admin.from('events').insert({
       business_id: business.id,
       type: 'call.ignored_spam',
@@ -324,11 +332,7 @@ Deno.serve(async (req: Request) => {
     transcript: fields.transcript,
   })
 
-  const { error: insertError } = await admin.from('calls').upsert(
-    { ...baseCallRow, summary_es: summaryEs, is_spam: false, status: 'new' },
-    { onConflict: 'provider_call_id', ignoreDuplicates: true },
-  )
-  if (insertError) throw insertError
+  await admin.from('calls').update({ summary_es: summaryEs }).eq('id', claimedCall.id)
 
   if (!summaryEs) {
     await admin.from('events').insert({
