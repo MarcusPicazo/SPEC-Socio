@@ -73,3 +73,10 @@ export function computeQuoteTotals(items: QuoteItem[]): QuoteTotals {
 export function formatUsd(amount: number): string {
   return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Deliberately simple — just enough to catch "that's not an email" before we try to send to it. */
+export function isLikelyEmail(value: string): boolean {
+  return EMAIL_RE.test(value.trim())
+}

@@ -17,13 +17,15 @@ import { isCorrectionTranscript, extractQuote, type ExistingDraftContext } from 
 import {
   computeQuoteTotals,
   formatUsd,
+  isLikelyEmail,
   matchCustomersByHint,
   nextQuoteNumber,
   toQuoteItems,
   type ResolvedQuoteItem,
 } from './quote-helpers.ts'
+import { sendQuoteEmail } from './quote-email.ts'
 import { sendDocument, sendFreeText, sendInteractiveButtons, sendInteractiveList } from './whatsapp.ts'
-import type { Business, QuoteExtraction, QuoteExtractionItem, QuoteItem } from './types.ts'
+import type { Business, Quote, QuoteExtraction, QuoteExtractionItem, QuoteItem } from './types.ts'
 
 // Shared with whatsapp-webhook/index.ts, which parses these back out of
 // the button tap — defined once here so sender and parser can't drift.
@@ -36,6 +38,7 @@ type DraftStatus =
   | 'awaiting_customer_name'
   | 'awaiting_customer_email'
   | 'awaiting_clarification'
+  | 'awaiting_send_email'
   | 'ready'
 
 export interface QuoteDraftRow {
@@ -160,6 +163,19 @@ export async function handleIncomingVoiceNote(
 
   const correction = isCorrectionTranscript(transcript)
   const inProgressDraft = await getActiveDraft(admin, business.id)
+
+  // A pending "waiting for this quote's customer email" isn't a quote
+  // being built — don't let an unrelated voice note treat it as one (it
+  // would also collide with the one-draft-per-business unique index).
+  if (inProgressDraft?.status === 'awaiting_send_email') {
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: 'Antes de eso, dime el correo del cliente para mandar la cotización pendiente — en un momento te pregunto otra vez.',
+    })
+    return
+  }
+
   const promotedDraft = inProgressDraft ? null : await getActivePromotedDraft(admin, business.id)
 
   if (correction && !inProgressDraft && !promotedDraft) {
@@ -280,6 +296,11 @@ export async function handleDraftTextReply(
     return
   }
 
+  if (draft.status === 'awaiting_send_email') {
+    await handleSendEmailReply(admin, business, draft, text, replyTo)
+    return
+  }
+
   if (draft.status === 'awaiting_clarification') {
     const question = draft.needs_clarification[0] ?? ''
     const qaHistory = [...draft.qa_history, { question, answer: text }]
@@ -308,6 +329,186 @@ export async function handleDraftTextReply(
 
     await applyExtractionResult(admin, business, { ...draft, qa_history: qaHistory }, extraction, replyTo)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Entry point: the "Enviar" button, and its email follow-up question
+// ---------------------------------------------------------------------------
+
+/** Called when the owner taps "Enviar" on a quote's WhatsApp document message. */
+export async function handleSendQuoteRequest(
+  admin: SupabaseClient,
+  business: Business,
+  quoteId: string,
+  replyTo: string,
+): Promise<void> {
+  const { data: quote } = await admin
+    .from('quotes')
+    .select('*, customers(id, name, email)')
+    .eq('id', quoteId)
+    .eq('business_id', business.id)
+    .maybeSingle()
+
+  if (!quote) {
+    await sendFreeText(admin, { businessId: business.id, to: replyTo, body: 'No encontré esa cotización.' })
+    return
+  }
+
+  if (quote.status !== 'draft') {
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: `La cotización ${quote.number} ya se envió — no hace falta mandarla otra vez.`,
+    })
+    return
+  }
+
+  const customer = quote.customers as { id: string; name: string | null; email: string | null }
+
+  if (customer.email) {
+    await sendQuoteToCustomer(admin, business, quote as Quote, { name: customer.name, email: customer.email }, replyTo)
+    return
+  }
+
+  // Needs the customer's email first — held as its own quote_drafts state,
+  // same mechanism as the voice-note questions. One active draft per
+  // business, so a draft for a DIFFERENT quote means "finish that first";
+  // a draft already waiting on THIS quote's email just gets re-asked.
+  const existingDraft = await getActiveDraft(admin, business.id)
+  const alreadyWaitingOnThisQuote =
+    existingDraft?.status === 'awaiting_send_email' && existingDraft.promoted_quote_id === quote.id
+
+  if (existingDraft && !alreadyWaitingOnThisQuote) {
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: 'Termina lo que estás haciendo ahora antes de mandar esta cotización.',
+    })
+    return
+  }
+
+  if (!existingDraft) {
+    await admin
+      .from('quote_drafts')
+      .insert({ business_id: business.id, status: 'awaiting_send_email', promoted_quote_id: quote.id })
+  }
+
+  await sendFreeText(admin, {
+    businessId: business.id,
+    to: replyTo,
+    body: `¿Cuál es el correo de ${customer.name ?? 'tu cliente'} para mandarle la cotización ${quote.number}?`,
+  })
+}
+
+async function handleSendEmailReply(
+  admin: SupabaseClient,
+  business: Business,
+  draft: QuoteDraftRow,
+  text: string,
+  replyTo: string,
+): Promise<void> {
+  const email = text.trim()
+  if (!isLikelyEmail(email)) {
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: 'Ese correo no se ve válido 😕 ¿Puedes mandarlo otra vez?',
+    })
+    return
+  }
+
+  const { data: quote } = await admin
+    .from('quotes')
+    .select('*, customers(id, name)')
+    .eq('id', draft.promoted_quote_id as string)
+    .maybeSingle()
+
+  if (!quote) {
+    await admin.from('quote_drafts').update({ status: 'ready', promoted_quote_id: null }).eq('id', draft.id)
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: 'Ya no encontré esa cotización — intenta de nuevo desde el botón Enviar.',
+    })
+    return
+  }
+
+  await admin.from('customers').update({ email }).eq('id', quote.customer_id)
+  await admin.from('quote_drafts').update({ status: 'ready', promoted_quote_id: null }).eq('id', draft.id)
+
+  const customerName = (quote.customers as { name: string | null } | null)?.name ?? null
+  await sendQuoteToCustomer(admin, business, quote as Quote, { name: customerName, email }, replyTo)
+}
+
+/** Sends the quote email, marks it `sent`, logs it, and confirms to the owner. Not fatal to fail — the owner is told and the quote stays `draft` so Enviar can be retried. */
+async function sendQuoteToCustomer(
+  admin: SupabaseClient,
+  business: Business,
+  quote: Quote,
+  customer: { name: string | null; email: string },
+  replyTo: string,
+): Promise<void> {
+  const appBaseUrl = Deno.env.get('APP_BASE_URL')
+  if (!appBaseUrl) {
+    console.error('Falta APP_BASE_URL — no se pudo mandar el correo de la cotización.')
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: 'No pude mandar el correo — avísale al soporte de Socio.',
+    })
+    return
+  }
+  const publicUrl = `${appBaseUrl}/q/${quote.public_token}`
+
+  const emailResult = await sendQuoteEmail({
+    to: customer.email,
+    businessName: business.name,
+    customerName: customer.name,
+    quoteNumber: quote.number,
+    total: quote.total,
+    publicUrl,
+  })
+
+  await admin.from('messages').insert({
+    business_id: business.id,
+    direction: 'outbound',
+    channel: 'email',
+    to_addr: customer.email,
+    from_addr: Deno.env.get('RESEND_FROM_EMAIL') ?? null,
+    template: 'quote_email',
+    body: publicUrl,
+    provider_message_id: emailResult.providerMessageId,
+    status: emailResult.success ? 'sent' : 'failed',
+  })
+
+  if (!emailResult.success) {
+    console.error('No se pudo mandar el correo de la cotización', emailResult.error)
+    await admin.from('events').insert({
+      business_id: business.id,
+      type: 'quote.email_failed',
+      payload: { quote_id: quote.id, error: emailResult.error },
+    })
+    await sendFreeText(admin, {
+      businessId: business.id,
+      to: replyTo,
+      body: `No pude mandar el correo a ${customer.name ?? 'el cliente'} 😕 Intenta de nuevo en un momento con el botón Enviar.`,
+    })
+    return
+  }
+
+  await admin.from('quotes').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', quote.id)
+
+  await admin.from('events').insert({
+    business_id: business.id,
+    type: 'quote.sent',
+    payload: { quote_id: quote.id, number: quote.number },
+  })
+
+  await sendFreeText(admin, {
+    businessId: business.id,
+    to: replyTo,
+    body: `Enviada a ${customer.name ?? 'tu cliente'} ✉️ Te aviso cuando la abra o la acepte.`,
+  })
 }
 
 // ---------------------------------------------------------------------------
