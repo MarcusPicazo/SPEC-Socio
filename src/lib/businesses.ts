@@ -53,3 +53,24 @@ export async function provisionBusiness(businessId: string): Promise<ProvisionBu
   }
   return data as ProvisionBusinessResult
 }
+
+export interface CheckoutLinkResult {
+  url: string
+  whatsapp_sent: boolean
+  whatsapp_error: string | null
+}
+
+export async function generateCheckoutLink(businessId: string): Promise<CheckoutLinkResult> {
+  const { data, error } = await supabase.functions.invoke('create-checkout-link', {
+    body: { business_id: businessId },
+  })
+  if (error) {
+    const context = (error as { context?: Response }).context
+    if (context) {
+      const body = (await context.json().catch(() => null)) as { error?: string } | null
+      if (body?.error) throw new Error(body.error)
+    }
+    throw error
+  }
+  return data as CheckoutLinkResult
+}

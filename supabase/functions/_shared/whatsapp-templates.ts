@@ -33,3 +33,16 @@ export const REPORTE_SEMANAL_TEMPLATE = {
   // {{6}} monto aceptado.
   bodyParamCount: 6,
 }
+
+export const LINK_DE_PAGO_TEMPLATE = {
+  name: 'link_de_pago',
+  // {{1}} nombre del dueño, {{2}} link del checkout de Stripe.
+  bodyParamCount: 2,
+}
+
+export const PAGO_PENDIENTE_TEMPLATE = {
+  name: 'pago_pendiente',
+  // {{1}} nombre del dueño, {{2}} "vencida" o "cancelada", {{3}} link del
+  // portal de facturación de Stripe.
+  bodyParamCount: 3,
+}
