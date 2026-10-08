@@ -13,7 +13,8 @@ export interface DownloadedMedia {
 function credentials(): { accessToken: string; apiVersion: string } {
   const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
   if (!accessToken) throw new Error('Falta WHATSAPP_ACCESS_TOKEN en el entorno de la función.')
-  return { accessToken, apiVersion: Deno.env.get('WHATSAPP_API_VERSION') ?? 'v21.0' }
+  // Keep in sync with _shared/whatsapp.ts's GRAPH_API_VERSION_DEFAULT.
+  return { accessToken, apiVersion: Deno.env.get('WHATSAPP_API_VERSION') ?? 'v26.0' }
 }
 
 async function fetchMediaUrl(

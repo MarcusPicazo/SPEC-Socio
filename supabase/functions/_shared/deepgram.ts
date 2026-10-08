@@ -22,7 +22,12 @@ export async function transcribeSpanish(bytes: Uint8Array, mimeType: string): Pr
       Authorization: `Token ${apiKey}`,
       'Content-Type': mimeType,
     },
-    body: bytes,
+    // Wrapped in a Blob rather than passed as a raw Uint8Array: BodyInit's
+    // exact typed-array requirements have shifted across TS/lib versions
+    // (Uint8Array became generic over its buffer type), and Blob sidesteps
+    // the question entirely regardless of what `bytes`' generic parameter
+    // happens to be.
+    body: new Blob([bytes]),
   })
 
   const text = await response.text()
