@@ -7,7 +7,10 @@
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
 
-const GRAPH_API_VERSION_DEFAULT = 'v21.0'
+// Confirmed against Meta's Graph API changelog: v26.0 is current (released
+// 2026-07-29). v21.0 (our previous default) retires 2027-01-21 — override
+// with WHATSAPP_API_VERSION once Meta ships past v26.
+const GRAPH_API_VERSION_DEFAULT = 'v26.0'
 const WINDOW_MS = 24 * 60 * 60 * 1000
 
 export interface SendResult {

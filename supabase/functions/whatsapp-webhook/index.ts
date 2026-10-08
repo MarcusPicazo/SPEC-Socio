@@ -44,8 +44,8 @@ const UNKNOWN_SENDER_MESSAGE =
   'Si buscas al negocio al que le llamaste, contáctalo directamente a su número.'
 
 const HELP_MENU =
-  'No entendí ese mensaje 🤔. Por ahora puedo avisarte de llamadas nuevas — responde con ' +
-  'los botones que te mando ahí, o espera el próximo aviso.'
+  'No entendí ese mensaje 🤔. Puedo avisarte de llamadas nuevas — responde con los botones ' +
+  'que te mando ahí — o puedes mandarme una nota de voz para armar una cotización.'
 
 const CONFIRM_PREFIX = 'confirm:'
 const OWNER_CALL_PREFIX = 'owner_call:'

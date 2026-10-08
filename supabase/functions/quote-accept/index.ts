@@ -59,6 +59,17 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Esta cotización ya no se puede aceptar.' }, 409)
   }
 
+  if (quote.valid_until) {
+    // valid_until is a date (no time) — the quote is good through the end
+    // of that day, so expiry starts at the beginning of the next one.
+    const expiresAt = new Date(quote.valid_until as string)
+    expiresAt.setUTCDate(expiresAt.getUTCDate() + 1)
+    if (Date.now() >= expiresAt.getTime()) {
+      await admin.from('quotes').update({ status: 'expired' }).eq('id', quote.id)
+      return jsonResponse({ error: 'Esta cotización ya venció.' }, 409)
+    }
+  }
+
   await admin
     .from('quotes')
     .update({ status: 'accepted', accepted_at: new Date().toISOString() })
