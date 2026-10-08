@@ -42,3 +42,41 @@ export function sendQuoteEmail(args: {
     replyTo: args.replyTo,
   })
 }
+
+export function buildFollowupEmailSubject(businessName: string, quoteNumber: string): string {
+  return `Reminder: your quote from ${businessName} (${quoteNumber})`
+}
+
+export function buildFollowupEmailHtml(args: {
+  businessName: string
+  customerName: string | null
+  quoteNumber: string
+  total: number
+  publicUrl: string
+}): string {
+  const greeting = args.customerName ? `Hi ${args.customerName},` : 'Hi,'
+  return `
+<p>${greeting}</p>
+<p>Just checking in — quote ${args.quoteNumber} from ${args.businessName} for ${formatUsd(args.total)} is still available.</p>
+<p><a href="${args.publicUrl}">View your quote</a></p>
+<p>Thanks,<br>${args.businessName}</p>
+`.trim()
+}
+
+export function sendFollowupEmail(args: {
+  to: string
+  businessName: string
+  customerName: string | null
+  quoteNumber: string
+  total: number
+  publicUrl: string
+  replyTo?: string
+}): Promise<SendEmailResult> {
+  return sendEmail({
+    to: args.to,
+    fromName: args.businessName,
+    subject: buildFollowupEmailSubject(args.businessName, args.quoteNumber),
+    html: buildFollowupEmailHtml(args),
+    replyTo: args.replyTo,
+  })
+}
