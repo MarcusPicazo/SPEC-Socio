@@ -268,6 +268,18 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true, unmatched: true }, 200)
   }
 
+  // Day 3's transferCall tool is only ever attached when emergency_transfer
+  // is on, so this endedReason can only mean that path fired. It confirms
+  // Vapi *attempted* the transfer, not that the owner actually answered —
+  // Vapi's own docs are explicit that endedReason alone can't tell us that.
+  if (fields.endedReason === 'assistant-forwarded-call') {
+    await admin.from('events').insert({
+      business_id: business.id,
+      type: 'call.emergency_transferred',
+      payload: { call_id: fields.callId, ended_reason: fields.endedReason },
+    })
+  }
+
   const extraction = normalizeCallExtraction(fields.structuredData)
   const customerId = await findOrCreateCustomer(
     admin,

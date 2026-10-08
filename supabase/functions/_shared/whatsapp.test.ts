@@ -1,5 +1,5 @@
 import { assertEquals } from 'jsr:@std/assert@1'
-import { buildTemplateComponents, isWithinWindow, toWhatsAppNumber } from './whatsapp.ts'
+import { buildTemplateComponents, fromWhatsAppNumber, isWithinWindow, toWhatsAppNumber } from './whatsapp.ts'
 
 Deno.test('toWhatsAppNumber strips a leading +', () => {
   assertEquals(toWhatsAppNumber('+17135550142'), '17135550142')
@@ -7,6 +7,14 @@ Deno.test('toWhatsAppNumber strips a leading +', () => {
 
 Deno.test('toWhatsAppNumber leaves a number without + untouched', () => {
   assertEquals(toWhatsAppNumber('17135550142'), '17135550142')
+})
+
+Deno.test('fromWhatsAppNumber adds a leading + to a digits-only number', () => {
+  assertEquals(fromWhatsAppNumber('17135550142'), '+17135550142')
+})
+
+Deno.test('fromWhatsAppNumber leaves a number that already has + untouched', () => {
+  assertEquals(fromWhatsAppNumber('+17135550142'), '+17135550142')
 })
 
 Deno.test('buildTemplateComponents omits the body component when there are no params', () => {
