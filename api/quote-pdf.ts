@@ -3,6 +3,11 @@
 // quotes.pdf_path (and valid_until, if it wasn't set yet — SPEC: 30-day
 // validity). Called server-to-server by quote-drafts.ts after a quote is
 // created or corrected; protected by a shared secret, not Supabase auth.
+//
+// Each render gets its own versioned filename (…-{timestamp}.pdf) instead
+// of overwriting the same path — a public bucket can sit behind a CDN, so
+// overwriting in place risks a corrected quote still serving the old PDF
+// for a while. The previous file is deleted after pdf_path is updated.
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@supabase/supabase-js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
@@ -89,7 +94,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const pdfPath = `${quote.business_id}/${quote.public_token}.pdf`
+  const previousPdfPath = quote.pdf_path as string | null
+  const pdfPath = `${quote.business_id}/${quote.public_token}-${Date.now()}.pdf`
   const { error: uploadError } = await admin.storage
     .from('quotes-pdf')
     .upload(pdfPath, buffer, { contentType: 'application/pdf', upsert: true })
@@ -102,6 +108,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const updatePayload: Record<string, unknown> = { pdf_path: pdfPath }
   if (!quote.valid_until) updatePayload.valid_until = validUntil
   await admin.from('quotes').update(updatePayload).eq('id', quoteId)
+
+  if (previousPdfPath && previousPdfPath !== pdfPath) {
+    const { error: removeError } = await admin.storage.from('quotes-pdf').remove([previousPdfPath])
+    if (removeError) console.error('No se pudo borrar el PDF anterior', removeError)
+  }
 
   const { data: publicUrlData } = admin.storage.from('quotes-pdf').getPublicUrl(pdfPath)
 
