@@ -18,6 +18,8 @@ import { createAdminClient } from '../_shared/supabase-admin.ts'
 import { fillTemplate } from '../_shared/template.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
 import { extractCallFields, type ExtractedCallFields } from '../_shared/vapi-report.ts'
+import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
+import { NUEVA_LLAMADA_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
 
 const callSummaryTemplate = await Deno.readTextFile(
   new URL('../../../prompts/call-summary.md', import.meta.url),
@@ -158,6 +160,49 @@ async function generateSummaryEs(args: {
   return null
 }
 
+/**
+ * SPEC §2 momento 1: the owner must hear about a new call within 60s. Sent
+ * even when summary_es failed to generate — falling back to the raw
+ * description — because staying silent would be worse than a rough
+ * message (regla de oro: nunca más una llamada perdida).
+ */
+async function notifyOwnerOfNewCall(
+  admin: SupabaseClient,
+  args: { business: Business; extraction: CallExtraction; summaryEs: string | null; callId: string },
+): Promise<{ success: boolean; error: string | null }> {
+  const { business, extraction, summaryEs, callId } = args
+  const notEspecificado = 'No especificado'
+
+  const callerName = extraction.caller_name ?? 'Cliente sin nombre'
+  const resumen =
+    summaryEs ?? extraction.description ?? 'No se pudo generar el resumen. Revisa el panel.'
+  const phone = extraction.callback_number ?? notEspecificado
+  const address = extraction.address ?? notEspecificado
+  const preferredTime = extraction.preferred_time ?? notEspecificado
+
+  const freeText =
+    `📞 *Nueva llamada — ${callerName}*\n${resumen}\n` +
+    `Tel: ${phone} · ${address}\nPrefiere: ${preferredTime}`
+
+  const result = await sendTemplateOrFreeText(admin, {
+    businessId: business.id,
+    to: business.owner_whatsapp,
+    freeText,
+    freeTextButtons: [
+      { id: `confirm:${callId}`, title: NUEVA_LLAMADA_TEMPLATE.buttons[0] },
+      { id: `owner_call:${callId}`, title: NUEVA_LLAMADA_TEMPLATE.buttons[1] },
+    ],
+    template: {
+      name: NUEVA_LLAMADA_TEMPLATE.name,
+      languageCode: TEMPLATE_LANGUAGE,
+      bodyParams: [callerName, resumen, phone, address, preferredTime],
+      buttonPayloads: [{ payload: `confirm:${callId}` }, { payload: `owner_call:${callId}` }],
+    },
+  })
+
+  return { success: result.success, error: result.error }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Método no permitido.' }, 405)
 
@@ -277,15 +322,28 @@ Deno.serve(async (req: Request) => {
       type: 'call.summary_failed',
       payload: {
         call_id: fields.callId,
-        note: 'No se pudo generar summary_es tras 2 intentos. El aviso al dueño por WhatsApp se habilita en el Día 5; por ahora solo queda registrado aquí.',
+        note: 'No se pudo generar summary_es tras 2 intentos. Se le avisó al dueño igual, usando la descripción cruda como resumen.',
       },
     })
   }
 
+  const notification = await notifyOwnerOfNewCall(admin, {
+    business,
+    extraction,
+    summaryEs,
+    callId: fields.callId,
+  })
+
   await admin.from('events').insert({
     business_id: business.id,
     type: 'call.processed',
-    payload: { call_id: fields.callId, is_spam: false, summary_generated: Boolean(summaryEs) },
+    payload: {
+      call_id: fields.callId,
+      is_spam: false,
+      summary_generated: Boolean(summaryEs),
+      whatsapp_sent: notification.success,
+      whatsapp_error: notification.error,
+    },
   })
 
   return jsonResponse({ ok: true }, 200)
