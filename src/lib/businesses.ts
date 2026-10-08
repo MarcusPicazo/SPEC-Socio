@@ -33,3 +33,23 @@ export async function updateBusiness(id: string, input: BusinessInput): Promise<
   if (error) throw error
   return data as Business
 }
+
+export interface ProvisionBusinessResult {
+  vapi_assistant_id: string
+  phone_number_id: string
+}
+
+export async function provisionBusiness(businessId: string): Promise<ProvisionBusinessResult> {
+  const { data, error } = await supabase.functions.invoke('provision-business', {
+    body: { business_id: businessId },
+  })
+  if (error) {
+    const context = (error as { context?: Response }).context
+    if (context) {
+      const body = (await context.json().catch(() => null)) as { error?: string } | null
+      if (body?.error) throw new Error(body.error)
+    }
+    throw error
+  }
+  return data as ProvisionBusinessResult
+}

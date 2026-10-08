@@ -6,7 +6,10 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist', 'node_modules'] },
+  // supabase/functions runs on Deno, a separate runtime with its own
+  // globals and its own toolchain (deno lint/fmt) — not this project's
+  // browser-flavored ESLint config.
+  { ignores: ['dist', 'node_modules', 'supabase/functions'] },
   js.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
