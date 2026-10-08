@@ -1,14 +1,8 @@
 import { z } from 'npm:zod@3.23.8'
 import { callClaudeJson } from './anthropic.ts'
+import { QUOTE_EXTRACTION_PROMPT } from './prompts/quote-extraction.ts'
 import { fillTemplate } from './template.ts'
 import type { Business, QuoteExtraction } from './types.ts'
-
-// Declared under static_files in config.toml for every function that
-// imports this module (whatsapp-webhook) — a Deno.readTextFile call isn't
-// part of the ES module graph `deploy` bundles by default.
-const quoteExtractionTemplate = await Deno.readTextFile(
-  new URL('./prompts/quote-extraction.md', import.meta.url),
-)
 
 export const quoteExtractionItemSchema = z.object({
   description_es: z.string().min(1),
@@ -115,7 +109,7 @@ export async function extractQuote(args: {
 }): Promise<QuoteExtraction | null> {
   const model = Deno.env.get('QUOTE_EXTRACTION_MODEL') ?? 'claude-sonnet-5-5'
 
-  const prompt = fillTemplate(quoteExtractionTemplate, {
+  const prompt = fillTemplate(QUOTE_EXTRACTION_PROMPT, {
     owner_name: args.business.owner_name,
     business_name: args.business.name,
     trade: args.business.trade,

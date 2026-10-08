@@ -1,4 +1,7 @@
-Summarize this phone call for {{owner_name}}, the Spanish-speaking owner of
+// This is the editable prompt for the call-summary step (Claude Haiku).
+// Edit the text below directly — it's the LLM prompt, not application
+// logic, even though it now lives in a .ts file instead of a .md one.
+export const CALL_SUMMARY_PROMPT = `Summarize this phone call for {{owner_name}}, the Spanish-speaking owner of
 {{business_name}}.
 
 Write summary_es in Spanish: 2 to 3 short lines, the most urgent fact first. Be concrete
@@ -18,3 +21,4 @@ Call information:
 
 Transcript:
 {{transcript}}
+`

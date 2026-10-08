@@ -15,18 +15,13 @@ import { z } from 'npm:zod@3.23.8'
 import { callClaudeJson } from '../_shared/anthropic.ts'
 import { normalizeCallExtraction } from '../_shared/call-extraction.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
+import { CALL_SUMMARY_PROMPT } from '../_shared/prompts/call-summary.ts'
 import { fillTemplate } from '../_shared/template.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
 import { isUniqueViolation } from '../_shared/postgrest-errors.ts'
 import { extractCallFields, type ExtractedCallFields } from '../_shared/vapi-report.ts'
 import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
 import { NUEVA_LLAMADA_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
-
-// Declared under static_files in config.toml — a Deno.readTextFile call
-// isn't part of the ES module graph `deploy` bundles by default.
-const callSummaryTemplate = await Deno.readTextFile(
-  new URL('../_shared/prompts/call-summary.md', import.meta.url),
-)
 
 const envelopeSchema = z.object({
   message: z.object({ type: z.string() }).passthrough(),
@@ -133,7 +128,7 @@ async function generateSummaryEs(args: {
   const model = Deno.env.get('CALL_SUMMARY_MODEL') ?? 'claude-haiku-4-5-20251001'
   const notSpecified = 'No se especificó'
 
-  const prompt = fillTemplate(callSummaryTemplate, {
+  const prompt = fillTemplate(CALL_SUMMARY_PROMPT, {
     owner_name: args.business.owner_name,
     business_name: args.business.name,
     caller_name: args.extraction.caller_name ?? notSpecified,

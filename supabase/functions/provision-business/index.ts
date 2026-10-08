@@ -1,25 +1,18 @@
 // Given a business_id, creates or updates its Vapi voice assistant from
-// prompts/receptionist.md and the business's own data, imports/assigns its
-// Twilio number in Vapi, and saves vapi_assistant_id back onto the business.
+// _shared/prompts/receptionist.ts and the business's own data,
+// imports/assigns its Twilio number in Vapi, and saves vapi_assistant_id
+// back onto the business.
 //
 // Only callable by an authenticated operator (checked against the
 // `operators` table using the caller's own JWT) — never exposed publicly.
 
 import { z } from 'npm:zod@3.23.8'
 import { corsHeaders } from '../_shared/cors.ts'
+import { RECEPTIONIST_PROMPT } from '../_shared/prompts/receptionist.ts'
 import { createAdminClient, createUserClient } from '../_shared/supabase-admin.ts'
 import { fillTemplate } from '../_shared/template.ts'
 import type { Business, BusinessHours, BusinessService } from '../_shared/types.ts'
 import { createOrUpdateAssistant, createOrUpdatePhoneNumber } from '../_shared/vapi.ts'
-
-// Read once at cold start (per CLAUDE.md, prompts never live inside the
-// code). Lives in _shared/prompts/ — NOT the repo-root prompts/ — and is
-// declared under static_files in config.toml: `deploy` only bundles the
-// ES module graph by default, and a Deno.readTextFile call isn't part of
-// that graph, so the file would be missing at runtime without it.
-const receptionistTemplate = await Deno.readTextFile(
-  new URL('../_shared/prompts/receptionist.md', import.meta.url),
-)
 
 const requestSchema = z.object({ business_id: z.string().uuid() })
 
@@ -110,7 +103,7 @@ function buildSystemPrompt(business: Business): string {
     ? `If this sounds like a real emergency (active flooding, no power during extreme heat, a safety hazard), offer to transfer the call right now to ${business.owner_name}'s cell phone.`
     : `This line does not transfer emergency calls. Reassure the caller that ${business.owner_name} will call them back as soon as possible, and make sure the urgency is noted clearly.`
 
-  return fillTemplate(receptionistTemplate, {
+  return fillTemplate(RECEPTIONIST_PROMPT, {
     business_name: business.name,
     trade: business.trade,
     city: business.city,

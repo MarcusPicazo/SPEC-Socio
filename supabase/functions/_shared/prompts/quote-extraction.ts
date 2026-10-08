@@ -1,4 +1,8 @@
-You are extracting a draft service quote from a Spanish voice note recorded by
+// This is the editable prompt for the quote-extraction step (Claude
+// Sonnet). Edit the text below directly — it's the LLM prompt, not
+// application logic, even though it now lives in a .ts file instead of a
+// .md one.
+export const QUOTE_EXTRACTION_PROMPT = `You are extracting a draft service quote from a Spanish voice note recorded by
 {{owner_name}}, the owner of {{business_name}} ({{trade}}).
 
 Extract:
@@ -24,3 +28,4 @@ Rules:
 {{existing_draft_section}}
 Voice note transcript (Spanish):
 {{transcript}}
+`

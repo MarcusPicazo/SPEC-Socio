@@ -1,14 +1,12 @@
 # Los prompts se movieron
 
-Los archivos de `prompts/*.md` ahora viven en
-`supabase/functions/_shared/prompts/*.md`.
-
-**Por qué:** `supabase functions deploy` solo empaqueta lo que está dentro de
-`supabase/functions/`. Las funciones leían estos archivos con
-`Deno.readTextFile` en tiempo de arranque — eso no es un `import`, así que el
-bundler no los incluía, y las funciones fallaban al iniciar una vez
-desplegadas (aunque funcionaran perfecto en local). Moverlos adentro y
-declararlos con `static_files` en `supabase/config.toml` resuelve esto.
+Los prompts ahora viven como módulos de TypeScript en
+`supabase/functions/_shared/prompts/*.ts` (`call-summary.ts`,
+`quote-extraction.ts`, `receptionist.ts`), cada uno exportando una sola
+constante (`CALL_SUMMARY_PROMPT`, etc.) con el texto del prompt. Edita el
+texto directamente ahí — sigue siendo el prompt, no lógica de la
+aplicación, solo que ahora es un `import` normal en vez de un
+`Deno.readTextFile`.
 
 Esta carpeta se deja vacía a propósito, como señal de dónde buscar si algo
 sigue referenciando la ruta vieja.
