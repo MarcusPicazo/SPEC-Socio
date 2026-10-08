@@ -39,6 +39,7 @@ export interface Business {
   services: BusinessService[]
   emergency_transfer: boolean
   subscription_status: SubscriptionStatus
+  subscription_status_since: string
   stripe_customer_id: string | null
   trial_ends_at: string | null
   created_at: string
@@ -171,6 +172,7 @@ export interface Event {
   business_id: string | null
   type: string
   payload: Record<string, unknown>
+  provider_event_id: string | null
   created_at: string
 }
 

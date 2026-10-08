@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getBusiness, provisionBusiness } from '../lib/businesses'
+import { generateCheckoutLink, getBusiness, provisionBusiness } from '../lib/businesses'
 import { listRecentCallsForBusiness, type CallWithCustomer } from '../lib/calls'
 import {
   CALL_STATUS_LABELS,
@@ -22,6 +22,11 @@ export function BusinessDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [provisioning, setProvisioning] = useState(false)
   const [provisionError, setProvisionError] = useState<string | null>(null)
+  const [generatingLink, setGeneratingLink] = useState(false)
+  const [checkoutLinkError, setCheckoutLinkError] = useState<string | null>(null)
+  const [checkoutLinkResult, setCheckoutLinkResult] = useState<{ url: string; whatsappSent: boolean } | null>(
+    null,
+  )
 
   useEffect(() => {
     if (!id) return
@@ -66,6 +71,20 @@ export function BusinessDetailPage() {
       setProvisionError(err instanceof Error ? err.message : 'No se pudo activar la línea.')
     } finally {
       setProvisioning(false)
+    }
+  }
+
+  async function handleGenerateCheckoutLink(businessId: string) {
+    setGeneratingLink(true)
+    setCheckoutLinkError(null)
+    setCheckoutLinkResult(null)
+    try {
+      const result = await generateCheckoutLink(businessId)
+      setCheckoutLinkResult({ url: result.url, whatsappSent: result.whatsapp_sent })
+    } catch (err) {
+      setCheckoutLinkError(err instanceof Error ? err.message : 'No se pudo generar el link de pago.')
+    } finally {
+      setGeneratingLink(false)
     }
   }
 
@@ -127,6 +146,40 @@ export function BusinessDetailPage() {
           </p>
         )}
         {provisionError && <p className="mt-2 text-sm text-red-600">{provisionError}</p>}
+      </section>
+
+      <section className="rounded border border-gray-200 bg-white p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Suscripción
+        </h2>
+        <p className="text-sm text-gray-600">
+          {SUBSCRIPTION_STATUS_LABELS[business.subscription_status]}
+          {business.subscription_status === 'trialing' && business.trial_ends_at
+            ? ` · prueba hasta ${formatDateTime(business.trial_ends_at)}`
+            : ''}
+        </p>
+        <button
+          type="button"
+          onClick={() => handleGenerateCheckoutLink(business.id)}
+          disabled={generatingLink || business.subscription_status === 'active'}
+          className="mt-3 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          {generatingLink ? 'Generando…' : 'Generar link de pago'}
+        </button>
+        {checkoutLinkResult && (
+          <p className="mt-2 text-sm text-gray-600">
+            Link generado{checkoutLinkResult.whatsappSent ? ' y enviado por WhatsApp' : ' — no se pudo enviar por WhatsApp, cópialo a mano'}:{' '}
+            <a
+              href={checkoutLinkResult.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 underline"
+            >
+              {checkoutLinkResult.url}
+            </a>
+          </p>
+        )}
+        {checkoutLinkError && <p className="mt-2 text-sm text-red-600">{checkoutLinkError}</p>}
       </section>
 
       <section className="rounded border border-gray-200 bg-white p-4">
