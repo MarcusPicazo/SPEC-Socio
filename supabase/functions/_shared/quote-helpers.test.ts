@@ -2,6 +2,7 @@ import { assertEquals } from 'jsr:@std/assert@1'
 import {
   computeQuoteTotals,
   formatUsd,
+  isLikelyEmail,
   matchCustomersByHint,
   nextQuoteNumber,
   toQuoteItems,
@@ -76,4 +77,15 @@ Deno.test('computeQuoteTotals sums line totals with zero tax', () => {
 Deno.test('formatUsd formats whole and fractional amounts', () => {
   assertEquals(formatUsd(9500), '$9,500')
   assertEquals(formatUsd(150.5), '$150.5')
+})
+
+Deno.test('isLikelyEmail accepts a plain address, trimming whitespace', () => {
+  assertEquals(isLikelyEmail('sarah@example.com'), true)
+  assertEquals(isLikelyEmail('  sarah@example.com  '), true)
+})
+
+Deno.test('isLikelyEmail rejects text with no @ or no domain dot', () => {
+  assertEquals(isLikelyEmail('sarah'), false)
+  assertEquals(isLikelyEmail('sarah@example'), false)
+  assertEquals(isLikelyEmail('not an email'), false)
 })

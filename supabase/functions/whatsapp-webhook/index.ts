@@ -14,6 +14,7 @@ import {
   handleDraftListReply,
   handleDraftTextReply,
   handleIncomingVoiceNote,
+  handleSendQuoteRequest,
   SEND_QUOTE_BUTTON_PREFIX,
 } from '../_shared/quote-drafts.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
@@ -34,6 +35,7 @@ const TEXT_AWAITING_DRAFT_STATUSES = new Set([
   'awaiting_customer_name',
   'awaiting_customer_email',
   'awaiting_clarification',
+  'awaiting_send_email',
 ])
 
 const UNKNOWN_SENDER_MESSAGE =
@@ -204,14 +206,12 @@ async function processInboundMessage(admin: SupabaseClient, message: InboundMess
     return
   }
   if (buttonAction?.payload.startsWith(SEND_QUOTE_BUTTON_PREFIX)) {
-    // The actual send-to-customer flow (Resend email, status->sent) isn't
-    // built yet — that's its own, separate task. Still worth a real reply
-    // instead of falling through to the generic menu.
-    await sendFreeText(admin, {
-      businessId: business.id,
-      to: fromE164,
-      body: 'Todavía no puedo enviarla al cliente desde aquí — esa parte llega muy pronto. Por ahora puedes compartirle el PDF tú mismo.',
-    })
+    await handleSendQuoteRequest(
+      admin,
+      business as Business,
+      buttonAction.payload.slice(SEND_QUOTE_BUTTON_PREFIX.length),
+      fromE164,
+    )
     return
   }
 
