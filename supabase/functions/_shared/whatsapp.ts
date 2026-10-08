@@ -56,6 +56,11 @@ export function toWhatsAppNumber(e164: string): string {
   return e164.startsWith('+') ? e164.slice(1) : e164
 }
 
+/** Inverse of toWhatsAppNumber — WhatsApp sends `from` as digits only, our DB stores E.164 with a leading +. */
+export function fromWhatsAppNumber(waNumber: string): string {
+  return waNumber.startsWith('+') ? waNumber : `+${waNumber}`
+}
+
 /** Builds the template `components` array, omitting body/button parts that have nothing to send. */
 export function buildTemplateComponents(
   bodyParams?: string[],
@@ -174,6 +179,21 @@ export async function sendFreeText(
     body: args.body,
     providerMessageId: id,
     status: errorMessage ? 'failed' : 'sent',
+  })
+  return { success: !errorMessage, providerMessageId: id, error: errorMessage }
+}
+
+/**
+ * Sends free text with no business association and no `messages` log —
+ * `messages.business_id` is required, and this exists only for replying
+ * to a sender who isn't a registered business owner (whatsapp-webhook
+ * logs that fact to `events`, which does allow a null business_id).
+ */
+export async function sendFreeTextUnassociated(to: string, body: string): Promise<SendResult> {
+  const { id, errorMessage } = await postToGraph({
+    to: toWhatsAppNumber(to),
+    type: 'text',
+    text: { preview_url: false, body },
   })
   return { success: !errorMessage, providerMessageId: id, error: errorMessage }
 }
