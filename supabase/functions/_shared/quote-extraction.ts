@@ -3,8 +3,11 @@ import { callClaudeJson } from './anthropic.ts'
 import { fillTemplate } from './template.ts'
 import type { Business, QuoteExtraction } from './types.ts'
 
+// Declared under static_files in config.toml for every function that
+// imports this module (whatsapp-webhook) — a Deno.readTextFile call isn't
+// part of the ES module graph `deploy` bundles by default.
 const quoteExtractionTemplate = await Deno.readTextFile(
-  new URL('../../../prompts/quote-extraction.md', import.meta.url),
+  new URL('./prompts/quote-extraction.md', import.meta.url),
 )
 
 export const quoteExtractionItemSchema = z.object({

@@ -21,3 +21,32 @@ site_url = "http://localhost:5173"
 
 [edge_runtime]
 enabled = true
+
+# verify_jwt = false below: each of these already verifies its own caller
+# (Vapi's server secret, Meta's X-Hub-Signature-256, Stripe's event
+# signature, or — for quote-accept — the quote's own public_token) instead
+# of a Supabase-issued JWT, which Vapi/Meta/Stripe never send.
+#
+# static_files below: these functions (or something they import —
+# whatsapp-webhook via _shared/quote-drafts.ts -> _shared/quote-extraction.ts)
+# read a prompts/*.md file at runtime with Deno.readTextFile. That's not an
+# `import`, so `supabase functions deploy` won't bundle it unless listed
+# here explicitly. Paths are relative to this file and must stay inside
+# supabase/functions/ (Supabase CLI's current limitation).
+
+[functions.voice-webhook]
+verify_jwt = false
+static_files = ["./functions/_shared/prompts/call-summary.md"]
+
+[functions.provision-business]
+static_files = ["./functions/_shared/prompts/receptionist.md"]
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+static_files = ["./functions/_shared/prompts/quote-extraction.md"]
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.quote-accept]
+verify_jwt = false

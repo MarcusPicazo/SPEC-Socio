@@ -2,20 +2,30 @@
 // unauthenticated by design — the quote's own public_token is the
 // credential, same security model as the get_public_quote RPC. Never
 // exposes which quotes exist for a wrong/guessed token (404 either way).
+//
+// This is the one function a browser on a different origin (Vercel, not
+// Supabase) calls directly, so unlike the admin-only functions it needs
+// real CORS handling — restricted to our own frontend's origin, not "*".
 
+import { corsHeadersForOrigin } from '../_shared/cors.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import { formatUsd } from '../_shared/quote-helpers.ts'
 import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
 import { COTIZACION_ACEPTADA_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
 
+const appBaseUrl = Deno.env.get('APP_BASE_URL')
+const cors = corsHeadersForOrigin(appBaseUrl ?? '')
+
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...cors, 'Content-Type': 'application/json' },
   })
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+  if (!appBaseUrl) return jsonResponse({ error: 'Falta APP_BASE_URL en los secretos de la función.' }, 500)
   if (req.method !== 'POST') return jsonResponse({ error: 'Método no permitido.' }, 405)
 
   let body: unknown

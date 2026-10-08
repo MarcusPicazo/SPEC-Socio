@@ -12,13 +12,13 @@ import { fillTemplate } from '../_shared/template.ts'
 import type { Business, BusinessHours, BusinessService } from '../_shared/types.ts'
 import { createOrUpdateAssistant, createOrUpdatePhoneNumber } from '../_shared/vapi.ts'
 
-// Read once at cold start from the repo-root prompts/ folder (per
-// CLAUDE.md, prompts never live inside the code). If `supabase functions
-// deploy` ever fails to find this file because its bundler only ships
-// supabase/, copy receptionist.md into supabase/functions/_shared/prompts/
-// and update this path to match.
+// Read once at cold start (per CLAUDE.md, prompts never live inside the
+// code). Lives in _shared/prompts/ — NOT the repo-root prompts/ — and is
+// declared under static_files in config.toml: `deploy` only bundles the
+// ES module graph by default, and a Deno.readTextFile call isn't part of
+// that graph, so the file would be missing at runtime without it.
 const receptionistTemplate = await Deno.readTextFile(
-  new URL('../../../prompts/receptionist.md', import.meta.url),
+  new URL('../_shared/prompts/receptionist.md', import.meta.url),
 )
 
 const requestSchema = z.object({ business_id: z.string().uuid() })
