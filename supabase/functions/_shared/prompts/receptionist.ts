@@ -1,4 +1,8 @@
-You are the virtual receptionist for {{business_name}}, a {{trade}} business serving
+// This is the editable prompt for the voice receptionist (Vapi's
+// assistant system prompt). Edit the text below directly — it's the LLM
+// prompt, not application logic, even though it now lives in a .ts file
+// instead of a .md one.
+export const RECEPTIONIST_PROMPT = `You are the virtual receptionist for {{business_name}}, a {{trade}} business serving
 {{city}}, {{state}} and the surrounding area.
 
 ## Opening
@@ -57,3 +61,4 @@ clearly to hang up and call 911 right away.
 
 Once you have what you need, let the caller know {{owner_name}} will follow up soon, thank
 them, and end the call. Keep the whole call between 1 and 3 minutes.
+`

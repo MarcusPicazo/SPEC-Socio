@@ -80,20 +80,17 @@ npx supabase functions deploy weekly-report
 npx supabase functions deploy billing-reminders
 ```
 
-`supabase/config.toml` ya trae `verify_jwt = false` y `static_files` para las que
-los necesitan — no hace falta pasar flags extra. **`static_files` requiere Docker**
-(`supabase functions deploy` normal, no `--use-api`) — si no tienes Docker local, usa
-GitHub Actions o una máquina con Docker para este deploy.
+`supabase/config.toml` ya trae `verify_jwt = false` para las que lo necesitan — no
+hace falta pasar flags extra. Los prompts viven como módulos de TypeScript en
+`supabase/functions/_shared/prompts/*.ts` (no archivos `.md` sueltos), así que
+`deploy` los empaqueta igual que cualquier otro import — no dependen de Docker ni de
+`static_files`.
 
 Verifica localmente antes de desplegar (requiere Docker):
 
 ```bash
 npx supabase functions serve
 ```
-
-Si `voice-webhook`, `provision-business` o `whatsapp-webhook` no arrancan con un
-error de archivo no encontrado, revisa que `static_files` en `config.toml` apunte
-al prompt correcto dentro de `supabase/functions/_shared/prompts/`.
 
 ## 5. Variables de entorno en Vercel
 
