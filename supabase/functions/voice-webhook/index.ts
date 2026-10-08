@@ -21,8 +21,10 @@ import { extractCallFields, type ExtractedCallFields } from '../_shared/vapi-rep
 import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
 import { NUEVA_LLAMADA_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
 
+// Declared under static_files in config.toml — a Deno.readTextFile call
+// isn't part of the ES module graph `deploy` bundles by default.
 const callSummaryTemplate = await Deno.readTextFile(
-  new URL('../../../prompts/call-summary.md', import.meta.url),
+  new URL('../_shared/prompts/call-summary.md', import.meta.url),
 )
 
 const envelopeSchema = z.object({
