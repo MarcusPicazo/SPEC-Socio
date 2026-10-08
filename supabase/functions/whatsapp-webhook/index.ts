@@ -8,14 +8,31 @@
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
 import { verifyMetaSignature } from '../_shared/meta-signature.ts'
+import {
+  getActiveDraft,
+  handleDraftListReply,
+  handleDraftTextReply,
+  handleIncomingVoiceNote,
+} from '../_shared/quote-drafts.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
 import {
   extractButtonAction,
+  extractListReplyAction,
   parseInboundMessages,
   type InboundMessage,
 } from '../_shared/whatsapp-inbound.ts'
 import { fromWhatsAppNumber, sendFreeText, sendFreeTextUnassociated } from '../_shared/whatsapp.ts'
+
+// Statuses where quote_drafts is actively waiting on a free-text reply —
+// 'awaiting_customer' and 'awaiting_customer_list_choice' never persist
+// between requests (resolveCustomer runs synchronously right after),
+// so they're deliberately not included here.
+const TEXT_AWAITING_DRAFT_STATUSES = new Set([
+  'awaiting_customer_name',
+  'awaiting_customer_email',
+  'awaiting_clarification',
+])
 
 const UNKNOWN_SENDER_MESSAGE =
   'Hola 👋 Este número es solo para los dueños de negocio que son clientes de Socio. ' +
@@ -174,6 +191,24 @@ async function processInboundMessage(admin: SupabaseClient, message: InboundMess
       buttonAction.payload.slice(OWNER_CALL_PREFIX.length),
       fromE164,
     )
+    return
+  }
+
+  if (message.audioId) {
+    await handleIncomingVoiceNote(admin, business as Business, { id: message.audioId }, fromE164)
+    return
+  }
+
+  const activeDraft = await getActiveDraft(admin, business.id)
+
+  const listAction = extractListReplyAction(message)
+  if (activeDraft && listAction) {
+    await handleDraftListReply(admin, business as Business, activeDraft, listAction.id, fromE164)
+    return
+  }
+
+  if (activeDraft && message.textBody && TEXT_AWAITING_DRAFT_STATUSES.has(activeDraft.status)) {
+    await handleDraftTextReply(admin, business as Business, activeDraft, message.textBody, fromE164)
     return
   }
 

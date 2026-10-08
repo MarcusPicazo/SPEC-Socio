@@ -11,6 +11,11 @@
 //   with interactive.button_reply.{id,title}.
 // - a template's quick-reply button (Direct Send): top-level type
 //   'button', with button.{payload,text}.
+//
+// A list row pick arrives as interactive.type === 'list_reply', with
+// list_reply.{id,title,description}.
+//
+// A voice note arrives as type 'audio', with audio.{id,mime_type,voice}.
 
 export interface InboundMessage {
   id: string
@@ -22,10 +27,19 @@ export interface InboundMessage {
   buttonTitle: string | null
   interactiveButtonReplyId: string | null
   interactiveButtonReplyTitle: string | null
+  listReplyId: string | null
+  listReplyTitle: string | null
+  audioId: string | null
+  audioMimeType: string | null
 }
 
 export interface ButtonAction {
   payload: string
+  title: string
+}
+
+export interface ListReplyAction {
+  id: string
   title: string
 }
 
@@ -56,8 +70,10 @@ export function parseInboundMessages(rawBody: unknown): InboundMessage[] {
 
         const interactive = asRecord(m.interactive)
         const buttonReply = asRecord(interactive.button_reply)
+        const listReply = asRecord(interactive.list_reply)
         const button = asRecord(m.button)
         const text = asRecord(m.text)
+        const audio = asRecord(m.audio)
 
         messages.push({
           id,
@@ -69,6 +85,10 @@ export function parseInboundMessages(rawBody: unknown): InboundMessage[] {
           buttonTitle: asString(button.text),
           interactiveButtonReplyId: asString(buttonReply.id),
           interactiveButtonReplyTitle: asString(buttonReply.title),
+          listReplyId: asString(listReply.id),
+          listReplyTitle: asString(listReply.title),
+          audioId: asString(audio.id),
+          audioMimeType: asString(audio.mime_type),
         })
       }
     }
@@ -86,4 +106,9 @@ export function extractButtonAction(message: InboundMessage): ButtonAction | nul
     return { payload: message.buttonPayload, title: message.buttonTitle ?? '' }
   }
   return null
+}
+
+export function extractListReplyAction(message: InboundMessage): ListReplyAction | null {
+  if (!message.listReplyId) return null
+  return { id: message.listReplyId, title: message.listReplyTitle ?? '' }
 }

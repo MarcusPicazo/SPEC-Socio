@@ -118,7 +118,11 @@ export interface QuoteExtraction {
   customer_hint: string | null
   items: QuoteExtractionItem[]
   warranty_en: string | null
+  /** Spanish version of warranty_en, for the owner's WhatsApp preview — SPEC §6.3 only names warranty_en, but the owner never reads English. */
+  warranty_es: string | null
   notes_en: string | null
+  /** Spanish version of notes_en, for the same reason. */
+  notes_es: string | null
   needs_clarification: string[]
 }
 
