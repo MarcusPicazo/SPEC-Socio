@@ -7,7 +7,7 @@ export function RequireOperator({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   if (loading) {
-    return <div className="p-6 text-gray-500">Cargando…</div>
+    return <div className="p-6 text-sm text-gris-texto">Cargando…</div>
   }
 
   if (!user) {
@@ -17,10 +17,14 @@ export function RequireOperator({ children }: { children: ReactNode }) {
   if (!isOperator) {
     return (
       <div className="p-6">
-        <h1 className="text-lg font-semibold text-red-700">Sin acceso</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-[18px] font-medium text-error">Sin acceso</h1>
+        <p className="mt-2 text-sm text-gris-texto">
           Esta cuenta ({user.email}) no tiene permiso de operador. Pide que te agreguen a la
-          tabla <code className="rounded bg-gray-100 px-1">operators</code>.
+          tabla{' '}
+          <code className="border border-linea bg-superficie px-1 font-mono text-[13px]">
+            operators
+          </code>
+          .
         </p>
       </div>
     )
