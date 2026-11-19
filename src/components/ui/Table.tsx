@@ -52,9 +52,21 @@ export function Tr({
   return (
     <tr
       onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? 'button' : undefined}
       className={[
         'border-t border-linea',
-        onClick ? 'cursor-pointer' : '',
+        onClick ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracota' : '',
         selected ? 'bg-arena/30' : 'hover:bg-[#F7F5F0]',
       ].join(' ')}
     >
