@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
+import { Badge } from '../components/ui/Badge'
+import { Button, buttonClassName } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
 import { formatDateEn, formatMoney } from '../lib/format'
 import { acceptPublicQuote, getPublicQuote, getQuotePdfUrl, markQuoteViewed } from '../lib/publicQuote'
 import type { PublicQuote } from '../types'
@@ -59,7 +62,7 @@ export function PublicQuotePage() {
   if (loading) {
     return (
       <PageShell>
-        <p className="text-center text-gray-500">Loading…</p>
+        <p className="text-center text-sm text-gris-texto">Loading…</p>
       </PageShell>
     )
   }
@@ -67,7 +70,7 @@ export function PublicQuotePage() {
   if (error || !quote) {
     return (
       <PageShell>
-        <p className="text-center text-gray-600">{error ?? 'Quote not found.'}</p>
+        <p className="text-center text-sm text-gris-texto">{error ?? 'Quote not found.'}</p>
       </PageShell>
     )
   }
@@ -78,78 +81,75 @@ export function PublicQuotePage() {
   return (
     <PageShell>
       <header>
-        <h1 className="text-lg font-semibold text-gray-900">{quote.business.name}</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-[22px] font-medium tracking-[-0.03em] text-tinta">{quote.business.name}</h1>
+        <p className="text-sm text-gris-texto">
           {quote.business.trade} · {quote.business.city}, {quote.business.state}
         </p>
       </header>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Quote</span>
-          <span className="font-medium text-gray-900">{quote.number}</span>
+      <Card>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gris-texto">Quote</span>
+          <span className="font-medium text-tinta">{quote.number}</span>
         </div>
         {quote.customer.name && (
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-sm text-gray-500">Prepared for</span>
-            <span className="text-gray-900">{quote.customer.name}</span>
+          <div className="mt-1 flex items-center justify-between text-sm">
+            <span className="text-gris-texto">Prepared for</span>
+            <span className="text-tinta">{quote.customer.name}</span>
           </div>
         )}
         {quote.valid_until && (
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-sm text-gray-500">Valid until</span>
-            <span className="text-gray-900">{formatDateEn(quote.valid_until)}</span>
+          <div className="mt-1 flex items-center justify-between text-sm">
+            <span className="text-gris-texto">Valid until</span>
+            <span className="text-tinta">{formatDateEn(quote.valid_until)}</span>
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Items</h2>
-        <ul className="divide-y divide-gray-100">
+      <Card title="Items">
+        <ul className="divide-y divide-linea">
           {quote.items.map((item, index) => (
             <li key={index} className="flex items-start justify-between gap-3 py-2">
               <div>
-                <p className="text-sm text-gray-900">{item.description_en}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-tinta">{item.description_en}</p>
+                <p className="text-xs text-gris-texto">
                   {item.qty} {item.unit} × {formatMoney(item.unit_price, quote.currency)}
                 </p>
               </div>
-              <span className="whitespace-nowrap font-medium text-gray-900">
+              <span className="whitespace-nowrap font-medium text-tinta">
                 {formatMoney(item.total, quote.currency)}
               </span>
             </li>
           ))}
         </ul>
-        <div className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm">
-          <div className="flex justify-between text-gray-600">
+        <div className="mt-3 space-y-1 border-t border-linea pt-3 text-sm">
+          <div className="flex justify-between text-gris-texto">
             <span>Subtotal</span>
             <span>{formatMoney(quote.subtotal, quote.currency)}</span>
           </div>
           {quote.tax > 0 && (
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-gris-texto">
               <span>Tax</span>
               <span>{formatMoney(quote.tax, quote.currency)}</span>
             </div>
           )}
-          <div className="flex justify-between text-base font-semibold text-gray-900">
+          <div className="flex justify-between text-base font-medium text-tinta">
             <span>Total</span>
             <span>{formatMoney(quote.total, quote.currency)}</span>
           </div>
         </div>
-      </section>
+      </Card>
 
       {quote.warranty_en && (
-        <section className="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">Warranty</h2>
-          <p className="text-sm text-gray-700">{quote.warranty_en}</p>
-        </section>
+        <Card title="Warranty">
+          <p className="text-sm text-tinta">{quote.warranty_en}</p>
+        </Card>
       )}
 
       {quote.notes_en && (
-        <section className="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">Notes</h2>
-          <p className="text-sm text-gray-700">{quote.notes_en}</p>
-        </section>
+        <Card title="Notes">
+          <p className="text-sm text-tinta">{quote.notes_en}</p>
+        </Card>
       )}
 
       <div className="space-y-2 pb-6">
@@ -158,27 +158,22 @@ export function PublicQuotePage() {
             href={pdfUrl}
             target="_blank"
             rel="noreferrer"
-            className="block w-full rounded-lg border border-gray-300 bg-white py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className={buttonClassName({ variant: 'secondary', className: 'w-full' })}
           >
             Download PDF
           </a>
         )}
 
         {isAccepted ? (
-          <div className="rounded-lg bg-green-50 py-3 text-center text-sm font-medium text-green-700">
-            ✓ Accepted
+          <div className="flex w-full items-center justify-center py-3">
+            <Badge variant="exito">Accepted</Badge>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={handleAccept}
-            disabled={accepting}
-            className="block w-full rounded-lg bg-gray-900 py-3 text-center text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-          >
+          <Button variant="primary" className="w-full" onClick={handleAccept} disabled={accepting}>
             {accepting ? 'Accepting…' : 'Accept'}
-          </button>
+          </Button>
         )}
-        {acceptError && <p className="text-center text-sm text-red-600">{acceptError}</p>}
+        {acceptError && <p className="text-center text-sm text-error">{acceptError}</p>}
       </div>
     </PageShell>
   )
@@ -186,7 +181,7 @@ export function PublicQuotePage() {
 
 function PageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6">
+    <div className="min-h-screen bg-papel px-4 py-6">
       <div className="mx-auto max-w-md space-y-4">{children}</div>
     </div>
   )
