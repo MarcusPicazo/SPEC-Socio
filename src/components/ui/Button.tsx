@@ -22,6 +22,32 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   ghost: 'text-gris-texto hover:text-tinta',
 }
 
+/**
+ * Las clases del botón, por si hace falta el mismo look en un elemento que
+ * no puede ser un <button> (por ejemplo un <Link> de react-router — un
+ * <button> dentro de un <a> no es válido en HTML).
+ */
+export function buttonClassName({
+  variant = 'primary',
+  dense = false,
+  className = '',
+}: {
+  variant?: ButtonVariant
+  dense?: boolean
+  className?: string
+}): string {
+  const boxed = variant !== 'ghost'
+  return [
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none',
+    'font-mono text-xs uppercase tracking-[0.08em]',
+    'transition-colors duration-100',
+    'disabled:cursor-not-allowed disabled:opacity-50',
+    boxed ? `px-4 ${dense ? 'h-9' : 'h-10'}` : '',
+    VARIANT_CLASSES[variant],
+    className,
+  ].join(' ')
+}
+
 export function Button({
   variant = 'primary',
   dense = false,
@@ -30,20 +56,8 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const boxed = variant !== 'ghost'
   return (
-    <button
-      {...props}
-      className={[
-        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none',
-        'font-mono text-xs uppercase tracking-[0.08em]',
-        'transition-colors duration-100',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        boxed ? `px-4 ${dense ? 'h-9' : 'h-10'}` : '',
-        VARIANT_CLASSES[variant],
-        className,
-      ].join(' ')}
-    >
+    <button {...props} className={buttonClassName({ variant, dense, className })}>
       {children}
       {arrow && <span aria-hidden="true">→</span>}
     </button>
