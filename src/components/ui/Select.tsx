@@ -3,7 +3,7 @@ import type { ReactNode, SelectHTMLAttributes } from 'react'
 // Mismo tratamiento visual que Input — BRAND-PANEL.md §5.
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string
-  error?: string
+  error?: string | undefined
   children: ReactNode
 }
 

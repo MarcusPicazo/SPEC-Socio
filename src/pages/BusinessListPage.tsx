@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { buttonClassName } from '../components/ui/Button'
+import { SubscriptionStatusBadge } from '../components/ui/Badge'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Table, TableBody, TableHead, Td, Th, Tr } from '../components/ui/Table'
 import { listBusinesses } from '../lib/businesses'
 import { getCallCountsLast7Days } from '../lib/calls'
 import { SUBSCRIPTION_STATUS_LABELS } from '../lib/format'
@@ -33,57 +37,54 @@ export function BusinessListPage() {
   }, [])
 
   return (
-    <div className="p-6">
+    <div className="p-6 min-[900px]:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Negocios</h1>
-        <Link
-          to="/admin/negocios/nuevo"
-          className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
+        <h1 className="text-[28px] font-medium tracking-[-0.03em] text-tinta">Negocios</h1>
+        <Link to="/admin/negocios/nuevo" className={buttonClassName({ variant: 'primary' })}>
           + Nuevo negocio
         </Link>
       </div>
 
-      {loading && <p className="mt-6 text-gray-500">Cargando…</p>}
-      {error && <p className="mt-6 text-red-600">{error}</p>}
+      {loading && <p className="mt-6 text-sm text-gris-texto">Cargando…</p>}
+      {error && <p className="mt-6 text-sm text-error">{error}</p>}
 
       {!loading && !error && businesses.length === 0 && (
-        <p className="mt-6 text-gray-500">Todavía no hay negocios dados de alta.</p>
+        <div className="mt-6">
+          <EmptyState message="Todavía no hay negocios dados de alta." />
+        </div>
       )}
 
       {!loading && !error && businesses.length > 0 && (
-        <div className="mt-6 overflow-hidden rounded border border-gray-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-gray-500">
-              <tr>
-                <th className="px-4 py-2 font-medium">Nombre</th>
-                <th className="px-4 py-2 font-medium">Ciudad</th>
-                <th className="px-4 py-2 font-medium">Suscripción</th>
-                <th className="px-4 py-2 font-medium">Llamadas (7 días)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+        <div className="mt-6">
+          <Table>
+            <TableHead>
+              <Th>Nombre</Th>
+              <Th>Ciudad</Th>
+              <Th>Suscripción</Th>
+              <Th align="right">Llamadas (7 días)</Th>
+            </TableHead>
+            <TableBody>
               {businesses.map((business) => (
-                <tr key={business.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/admin/negocios/${business.id}`}
-                      className="font-medium text-gray-900 hover:underline"
-                    >
+                <Tr key={business.id}>
+                  <Td>
+                    <Link to={`/admin/negocios/${business.id}`} className="text-tinta hover:underline">
                       {business.name}
                     </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  </Td>
+                  <Td>
                     {business.city}, {business.state}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {SUBSCRIPTION_STATUS_LABELS[business.subscription_status]}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{callCounts[business.id] ?? 0}</td>
-                </tr>
+                  </Td>
+                  <Td>
+                    <SubscriptionStatusBadge
+                      status={business.subscription_status}
+                      label={SUBSCRIPTION_STATUS_LABELS[business.subscription_status]}
+                    />
+                  </Td>
+                  <Td numeric>{callCounts[business.id] ?? 0}</Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

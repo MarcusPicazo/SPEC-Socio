@@ -1,6 +1,10 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { z } from 'zod'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { Input, inputClassName } from '../components/ui/Input'
+import { Select } from '../components/ui/Select'
 import { createBusiness, getBusiness, updateBusiness } from '../lib/businesses'
 import { formatDateTime, SUBSCRIPTION_STATUS_LABELS } from '../lib/format'
 import {
@@ -131,103 +135,109 @@ export function BusinessFormPage() {
     }
   }
 
-  if (loading) return <div className="p-6 text-gray-500">Cargando…</div>
-  if (loadError) return <div className="p-6 text-red-600">{loadError}</div>
+  if (loading) return <div className="p-6 text-sm text-gris-texto">Cargando…</div>
+  if (loadError) return <div className="p-6 text-sm text-error">{loadError}</div>
 
   const hasHoursError = Object.keys(errors).some((key) => key.startsWith('hours'))
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <h1 className="text-xl font-semibold text-gray-900">
+    <div className="mx-auto max-w-2xl p-6 min-[900px]:p-8">
+      <h1 className="text-[28px] font-medium tracking-[-0.03em] text-tinta">
         {isEditing ? 'Editar negocio' : 'Nuevo negocio'}
       </h1>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-        <Section title="Datos generales">
-          <Field label="Nombre del negocio" error={errors.name}>
-            <input
+        <Card title="Datos generales">
+          <div className="space-y-3">
+            <Input
+              label="Nombre del negocio"
+              name="name"
               value={values.name}
               onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-              className={inputClass(errors.name)}
+              error={errors.name}
             />
-          </Field>
-          <Field label="Giro (ej. techado, jardinería)" error={errors.trade}>
-            <input
+            <Input
+              label="Giro (ej. techado, jardinería)"
+              name="trade"
               value={values.trade}
               onChange={(e) => setValues((v) => ({ ...v, trade: e.target.value }))}
-              className={inputClass(errors.trade)}
+              error={errors.trade}
             />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Ciudad" error={errors.city}>
-              <input
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Ciudad"
+                name="city"
                 value={values.city}
                 onChange={(e) => setValues((v) => ({ ...v, city: e.target.value }))}
-                className={inputClass(errors.city)}
+                error={errors.city}
               />
-            </Field>
-            <Field label="Estado" error={errors.state}>
-              <input
+              <Input
+                label="Estado"
+                name="state"
+                placeholder="TX"
                 value={values.state}
                 onChange={(e) => setValues((v) => ({ ...v, state: e.target.value }))}
-                placeholder="TX"
-                className={inputClass(errors.state)}
+                error={errors.state}
               />
-            </Field>
-          </div>
-          <Field label="Zona horaria" error={errors.timezone}>
-            <select
+            </div>
+            <Select
+              label="Zona horaria"
+              name="timezone"
               value={values.timezone}
               onChange={(e) => setValues((v) => ({ ...v, timezone: e.target.value }))}
-              className={inputClass(errors.timezone)}
+              error={errors.timezone}
             >
               {US_TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}
                 </option>
               ))}
-            </select>
-          </Field>
-        </Section>
+            </Select>
+          </div>
+        </Card>
 
-        <Section title="Dueño">
-          <Field label="Nombre del dueño" error={errors.owner_name}>
-            <input
+        <Card title="Dueño">
+          <div className="space-y-3">
+            <Input
+              label="Nombre del dueño"
+              name="owner_name"
               value={values.owner_name}
               onChange={(e) => setValues((v) => ({ ...v, owner_name: e.target.value }))}
-              className={inputClass(errors.owner_name)}
+              error={errors.owner_name}
             />
-          </Field>
-          <Field label="WhatsApp del dueño (formato internacional)" error={errors.owner_whatsapp}>
-            <input
+            <Input
+              label="WhatsApp del dueño (formato internacional)"
+              name="owner_whatsapp"
+              placeholder="+17135550123"
               value={values.owner_whatsapp}
               onChange={(e) => setValues((v) => ({ ...v, owner_whatsapp: e.target.value }))}
-              placeholder="+17135550123"
-              className={inputClass(errors.owner_whatsapp)}
+              error={errors.owner_whatsapp}
             />
-          </Field>
-        </Section>
+          </div>
+        </Card>
 
-        <Section title="Teléfono y emergencias">
-          <Field label="Número de Twilio asignado (opcional por ahora)" error={errors.twilio_number}>
-            <input
+        <Card title="Teléfono y emergencias">
+          <div className="space-y-3">
+            <Input
+              label="Número de Twilio asignado (opcional por ahora)"
+              name="twilio_number"
+              placeholder="+17135550199"
               value={values.twilio_number}
               onChange={(e) => setValues((v) => ({ ...v, twilio_number: e.target.value }))}
-              placeholder="+17135550199"
-              className={inputClass(errors.twilio_number)}
+              error={errors.twilio_number}
             />
-          </Field>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={values.emergency_transfer}
-              onChange={(e) => setValues((v) => ({ ...v, emergency_transfer: e.target.checked }))}
-            />
-            Transferir emergencias al celular del dueño
-          </label>
-        </Section>
+            <label className="flex items-center gap-2 text-sm text-tinta">
+              <input
+                type="checkbox"
+                checked={values.emergency_transfer}
+                onChange={(e) => setValues((v) => ({ ...v, emergency_transfer: e.target.checked }))}
+              />
+              Transferir emergencias al celular del dueño
+            </label>
+          </div>
+        </Card>
 
-        <Section title="Servicios y rangos de precio">
+        <Card title="Servicios y rangos de precio">
           <div className="space-y-2">
             {values.services.map((service, index) => (
               <div key={index} className="flex items-end gap-2">
@@ -236,10 +246,10 @@ export function BusinessFormPage() {
                     value={service.name}
                     onChange={(e) => updateService(index, { name: e.target.value })}
                     placeholder="Nombre del servicio"
-                    className={inputClass(errors[`services.${index}.name`])}
+                    className={inputClassName(errors[`services.${index}.name`])}
                   />
                   {errors[`services.${index}.name`] && (
-                    <p className="mt-1 text-xs text-red-600">{errors[`services.${index}.name`]}</p>
+                    <p className="mt-1 text-[13px] text-error">{errors[`services.${index}.name`]}</p>
                   )}
                 </div>
                 <div className="w-28">
@@ -249,10 +259,10 @@ export function BusinessFormPage() {
                     value={service.price_min}
                     onChange={(e) => updateService(index, { price_min: Number(e.target.value) })}
                     placeholder="Mínimo"
-                    className={inputClass(errors[`services.${index}.price_min`])}
+                    className={inputClassName(errors[`services.${index}.price_min`])}
                   />
                   {errors[`services.${index}.price_min`] && (
-                    <p className="mt-1 text-xs text-red-600">
+                    <p className="mt-1 text-[13px] text-error">
                       {errors[`services.${index}.price_min`]}
                     </p>
                   )}
@@ -264,42 +274,39 @@ export function BusinessFormPage() {
                     value={service.price_max}
                     onChange={(e) => updateService(index, { price_max: Number(e.target.value) })}
                     placeholder="Máximo"
-                    className={inputClass(errors[`services.${index}.price_max`])}
+                    className={inputClassName(errors[`services.${index}.price_max`])}
                   />
                   {errors[`services.${index}.price_max`] && (
-                    <p className="mt-1 text-xs text-red-600">
+                    <p className="mt-1 text-[13px] text-error">
                       {errors[`services.${index}.price_max`]}
                     </p>
                   )}
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => removeService(index)}
                   disabled={values.services.length === 1}
-                  className="rounded border border-gray-300 px-2 py-2 text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                  className="h-10"
                 >
                   Quitar
-                </button>
+                </Button>
               </div>
             ))}
           </div>
-          {errors.services && <p className="mt-2 text-sm text-red-600">{errors.services}</p>}
-          <button
-            type="button"
-            onClick={addService}
-            className="mt-3 text-sm font-medium text-gray-700 hover:underline"
-          >
+          {errors.services && <p className="mt-2 text-sm text-error">{errors.services}</p>}
+          <Button type="button" variant="ghost" onClick={addService} className="mt-3">
             + Agregar servicio
-          </button>
-        </Section>
+          </Button>
+        </Card>
 
-        <Section title="Horario">
+        <Card title="Horario">
           <div className="space-y-2">
             {DAYS_OF_WEEK.map((day) => {
               const dayHours = values.hours[day.key]
               const open = dayHours !== null && dayHours !== undefined
               return (
-                <div key={day.key} className="flex items-center gap-3 text-sm">
+                <div key={day.key} className="flex items-center gap-3 text-sm text-tinta">
                   <label className="flex w-32 items-center gap-2">
                     <input
                       type="checkbox"
@@ -314,85 +321,48 @@ export function BusinessFormPage() {
                         type="time"
                         value={dayHours.open}
                         onChange={(e) => setDayTime(day.key, 'open', e.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
+                        className={inputClassName(undefined, 'h-9 w-auto')}
                       />
-                      <span className="text-gray-400">a</span>
+                      <span className="text-gris-texto">a</span>
                       <input
                         type="time"
                         value={dayHours.close}
                         onChange={(e) => setDayTime(day.key, 'close', e.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1"
+                        className={inputClassName(undefined, 'h-9 w-auto')}
                       />
                     </>
                   )}
-                  {!open && <span className="text-gray-400">Cerrado</span>}
+                  {!open && <span className="text-gris-texto">Cerrado</span>}
                 </div>
               )
             })}
           </div>
           {hasHoursError && (
-            <p className="mt-2 text-sm text-red-600">Revisa el formato de los horarios (HH:MM).</p>
+            <p className="mt-2 text-sm text-error">Revisa el formato de los horarios (HH:MM).</p>
           )}
-        </Section>
+        </Card>
 
         {isEditing && systemInfo && (
-          <Section title="Estado del sistema (no editable aquí)">
-            <dl className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-              <dt className="text-gray-400">Suscripción</dt>
-              <dd>{SUBSCRIPTION_STATUS_LABELS[systemInfo.subscription_status]}</dd>
-              <dt className="text-gray-400">Fin de prueba</dt>
-              <dd>{formatDateTime(systemInfo.trial_ends_at)}</dd>
-              <dt className="text-gray-400">Asistente de Vapi</dt>
-              <dd>{systemInfo.vapi_assistant_id ?? 'Sin activar'}</dd>
+          <Card title="Estado del sistema (no editable aquí)">
+            <dl className="grid grid-cols-2 gap-y-2 text-sm">
+              <dt className="text-gris-texto">Suscripción</dt>
+              <dd className="text-tinta">{SUBSCRIPTION_STATUS_LABELS[systemInfo.subscription_status]}</dd>
+              <dt className="text-gris-texto">Fin de prueba</dt>
+              <dd className="text-tinta">{formatDateTime(systemInfo.trial_ends_at)}</dd>
+              <dt className="text-gris-texto">Asistente de Vapi</dt>
+              <dd className="text-tinta">{systemInfo.vapi_assistant_id ?? 'Sin activar'}</dd>
             </dl>
-          </Section>
+          </Card>
         )}
 
-        {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+        {saveError && <p className="text-sm text-error">{saveError}</p>}
 
         <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-          >
+          <Button type="submit" variant="primary" disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
   )
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="rounded border border-gray-200 bg-white p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
-      <div className="space-y-3">{children}</div>
-    </div>
-  )
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string
-  error?: string | undefined
-  children: ReactNode
-}) {
-  return (
-    <label className="block text-sm font-medium text-gray-700">
-      {label}
-      <div className="mt-1">{children}</div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </label>
-  )
-}
-
-function inputClass(error?: string): string {
-  return `w-full rounded border px-3 py-2 text-sm focus:outline-none ${
-    error ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-gray-500'
-  }`
 }
