@@ -2,8 +2,10 @@
 // $199/month price with a 14-day trial. Idempotent — safe to run again,
 // it just reports what already exists instead of creating a duplicate.
 //
-// Run with: STRIPE_SECRET_KEY=sk_... deno run --allow-net --allow-env scripts/stripe-setup.ts
-// (or export the var first). Prints the price id to put in STRIPE_PRICE_ID.
+// Run it from GitHub: Actions → "Configurar Stripe" → Run workflow
+// (.github/workflows/stripe-setup.yml), which shows only the price id. Or:
+//   STRIPE_SECRET_KEY=sk_... deno run --node-modules-dir=none --allow-net --allow-env scripts/stripe-setup.ts
+// Prints the price id to put in STRIPE_PRICE_ID.
 
 import Stripe from 'npm:stripe@23.0.0'
 
