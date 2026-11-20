@@ -5,10 +5,8 @@
 // - stops there if the call was spam,
 // - otherwise generates summary_es with Claude Haiku and saves it too.
 //
-// Every delivery is logged in full to `events`, since the exact shape of
-// Vapi's payload could not be confirmed against live docs while building
-// this (see vapi-report.ts) — that log is how to check the real shape
-// after a first test call.
+// Every delivery is logged in full to `events` — vapi-report.ts follows
+// Vapi's documented shape, and that log confirms it on the first real call.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
 import { z } from 'npm:zod@3.23.8'
@@ -42,7 +40,13 @@ function jsonResponse(body: unknown, status: number): Response {
   })
 }
 
-/** Vapi's server.secret arrives as either a Bearer token or the legacy x-vapi-secret header — sources disagree, so this checks both. */
+/**
+ * Vapi authenticates webhooks with a Custom Credential referenced by
+ * server.credentialId (docs.vapi.ai/server-url/server-authentication,
+ * checked 2026-11-20). We set it up as a Bearer token in Authorization; the
+ * legacy X-Vapi-Secret header is still accepted in case the credential is
+ * configured that way instead.
+ */
 function verifySecret(req: Request): boolean {
   const expected = Deno.env.get('VAPI_SERVER_SECRET')
   if (!expected) return false

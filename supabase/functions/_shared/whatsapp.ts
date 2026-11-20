@@ -1,16 +1,20 @@
 // WhatsApp Cloud API client (outbound only — the inbound webhook that lets
-// isWindowOpen actually see an open window is Day 6's whatsapp-webhook).
-// developers.facebook.com is blocked by this environment's network policy,
-// so this is built from search results that quote Meta's docs, not a live
-// fetch. The Graph API version is a guess at a reasonably current one —
-// override WHATSAPP_API_VERSION if Meta deprecates it.
+// isWindowOpen actually see an open window is whatsapp-webhook).
+// Checked against Meta's docs on 2026-11-20
+// (developers.facebook.com/documentation/business-messaging/whatsapp/):
+// - messages/send-messages: free-form "service messages" only inside the
+//   24h customer service window, which every inbound message resets.
+// - messages/interactive-reply-buttons-messages: max 3 reply buttons, id up
+//   to 256 chars, title up to 20 chars.
+// - templates/overview: positional {{1}}..{{n}} body params, in order.
+// - The send examples use Graph API v27.0.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
+import { sanitizeTemplateParam } from './template-params.ts'
 
-// Confirmed against Meta's Graph API changelog: v26.0 is current (released
-// 2026-07-29). v21.0 (our previous default) retires 2027-01-21 — override
-// with WHATSAPP_API_VERSION once Meta ships past v26.
-const GRAPH_API_VERSION_DEFAULT = 'v26.0'
+// Meta's current send-message examples use v27.0. Override with
+// WHATSAPP_API_VERSION if Meta deprecates it.
+const GRAPH_API_VERSION_DEFAULT = 'v27.0'
 const WINDOW_MS = 24 * 60 * 60 * 1000
 
 export interface SendResult {
@@ -64,7 +68,11 @@ export function fromWhatsAppNumber(waNumber: string): string {
   return waNumber.startsWith('+') ? waNumber : `+${waNumber}`
 }
 
-/** Builds the template `components` array, omitting body/button parts that have nothing to send. */
+/**
+ * Builds the template `components` array, omitting body/button parts that
+ * have nothing to send. Body params are cleaned with sanitizeTemplateParam
+ * (no new lines, tabs or empty values), which Meta requires.
+ */
 export function buildTemplateComponents(
   bodyParams?: string[],
   buttonPayloads?: TemplateButtonPayload[],
@@ -74,7 +82,7 @@ export function buildTemplateComponents(
   if (bodyParams && bodyParams.length > 0) {
     components.push({
       type: 'body',
-      parameters: bodyParams.map((text) => ({ type: 'text', text })),
+      parameters: bodyParams.map((text) => ({ type: 'text', text: sanitizeTemplateParam(text) })),
     })
   }
 

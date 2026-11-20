@@ -1,13 +1,17 @@
 # DEPLOY.md — pasos exactos, en orden
 
+> **¿Sin terminal?** Sigue [`ENCENDIDO.md`](./ENCENDIDO.md). Los pasos 1, 3, 4 y 10 de
+> este archivo ya los hacen los workflows de GitHub Actions ("Desplegar Supabase",
+> "Configurar Stripe" y "Sembrar negocio demo"), con un botón **Run workflow**.
+
 Esto asume que ya tienes las cuentas de PROMPTS.md Día 0 (Meta, Supabase, Vercel,
 Twilio, Vapi, Anthropic, Deepgram, Resend, Stripe) y el proyecto de Supabase creado.
 
 ## 1. Migraciones
 
 ```bash
-npx supabase link --project-ref <tu-project-ref>
-npx supabase db push
+npx supabase link <tu-project-ref>
+npx supabase db push --remote --yes
 ```
 
 ## 2. Secretos en Supabase Vault (para pg_cron)
@@ -38,6 +42,7 @@ npx supabase secrets set \
   TWILIO_AUTH_TOKEN=... \
   VAPI_API_KEY=... \
   VAPI_SERVER_SECRET=... \
+  VAPI_SERVER_CREDENTIAL_ID=... \
   WHATSAPP_ACCESS_TOKEN=... \
   WHATSAPP_PHONE_NUMBER_ID=... \
   WHATSAPP_BUSINESS_ACCOUNT_ID=... \
@@ -63,7 +68,7 @@ Antes de crear el producto de Stripe, corre el script de setup y copia el
 `STRIPE_PRICE_ID` que imprime:
 
 ```bash
-STRIPE_SECRET_KEY=sk_... deno run --allow-net --allow-env scripts/stripe-setup.ts
+STRIPE_SECRET_KEY=sk_... deno run --node-modules-dir=none --allow-net --allow-env scripts/stripe-setup.ts
 ```
 
 ## 4. Desplegar las Edge Functions
@@ -134,9 +139,8 @@ En WhatsApp Manager → Message Templates, categoría **Utility**, idioma `es_MX
 | `link_de_pago` | {{1}} nombre del dueño, {{2}} link del checkout | — |
 | `pago_pendiente` | {{1}} nombre del dueño, {{2}} "vencida"/"cancelada", {{3}} link del portal de facturación | — |
 
-El texto exacto de cada una está en los mensajes de días anteriores de esta
-conversación y en `_shared/whatsapp-templates.ts` (los comentarios documentan el
-orden de las variables). La aprobación de Meta puede tardar hasta 24 horas —
+El texto exacto de cada una está en `ENCENDIDO.md` §7, y el orden de las variables en
+`_shared/whatsapp-templates.ts`. La aprobación de Meta puede tardar hasta 24 horas —
 hazlo antes de la primera llamada de prueba real.
 
 ## 8. Webhook de Stripe
@@ -149,18 +153,21 @@ Dashboard de Stripe → Developers → Webhooks → Add endpoint:
 - Copia el **Signing secret** a `STRIPE_WEBHOOK_SECRET` (paso 3) y vuelve a
   desplegar `stripe-webhook` si ya lo habías hecho antes de tener este valor.
 
-## 9. Llaves de proveedores dentro de Vapi
+## 9. Credencial del webhook dentro de Vapi
 
-Dashboard de Vapi → Settings → Provider Keys: conecta tu llave de **Anthropic** y
-de **Deepgram** ahí — el asistente las referencia por nombre de proveedor, pero
-Vapi necesita sus propias credenciales para usarlas, independientemente de las que
-configuraste en Supabase.
+Vapi ya no acepta el secreto directo en el asistente. Dashboard de Vapi →
+Integrations → Server Configuration → Add Custom Credential → Bearer Token, con
+Token = `VAPI_SERVER_SECRET` y header `Authorization` con prefijo Bearer. Copia el ID
+a `VAPI_SERVER_CREDENTIAL_ID` (paso 3).
+
+Las llaves propias de Anthropic o Deepgram en Integrations son opcionales: sin ellas,
+Vapi usa su integración por defecto y cobra en sus créditos.
 
 ## 10. Negocio demo y primera llamada de prueba
 
 ```bash
 SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEMO_OWNER_WHATSAPP=+1... \
-  deno run --allow-net --allow-env scripts/seed-demo-business.ts
+  deno run --node-modules-dir=none --allow-net --allow-env scripts/seed-demo-business.ts
 ```
 
 1. Entra a `/admin`, abre "Martinez Roofing", asigna el número de Twilio si el
@@ -174,7 +181,7 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEMO_OWNER_WHATSAPP=+1... \
 
 ## Orden recomendado si algo falla
 
-Si una Edge Function no arranca → revisa `static_files` (paso 4). Si un webhook
+Si una Edge Function no arranca → revisa sus logs en Supabase → Edge Functions. Si un webhook
 externo da 401 → revisa `verify_jwt` en `config.toml` y que el secreto en el
 paso 3 coincide exactamente con el que tiene el proveedor. Si el resumen o la
 cotización nunca llegan → revisa la tabla `events` en Supabase antes que nada,

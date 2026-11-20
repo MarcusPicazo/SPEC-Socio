@@ -1,0 +1,186 @@
+# Desplegar Supabase: migraciones + secretos de las Edge Functions + las 9
+# funciones. Se corre con el botón "Run workflow" (Actions → Desplegar
+# Supabase) y solo, cada vez que se hace merge a main con cambios en
+# supabase/.
+#
+# Basado en la documentación de Supabase consultada el 2026-11-20:
+# - supabase.com/docs/guides/functions/deploy (sección GitHub Actions)
+# - supabase.com/docs/guides/deployment/managing-environments
+# - supabase.com/docs/guides/functions/secrets
+# - CLI: `supabase link <ref>`, `supabase db push --remote --yes`,
+#   `supabase secrets set --env-file`, `supabase functions deploy`.
+#
+# Nunca imprime el valor de un secreto: solo revisa si existe y lo escribe a
+# un archivo temporal del runner que se borra al terminar.
+
+name: Desplegar Supabase
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-deploy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Migraciones, secretos y funciones
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_YES: '1'
+      FUNCTIONS: >-
+        voice-webhook whatsapp-webhook provision-business create-checkout-link
+        stripe-webhook quote-accept followups weekly-report billing-reminders
+
+    steps:
+      - name: Revisar que estén todos los secretos
+        env:
+          # Para hablar con Supabase
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          # Obligatorios para la primera llamada (ENCENDIDO.md, paso 7)
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          VAPI_API_KEY: ${{ secrets.VAPI_API_KEY }}
+          VAPI_SERVER_SECRET: ${{ secrets.VAPI_SERVER_SECRET }}
+          VAPI_SERVER_CREDENTIAL_ID: ${{ secrets.VAPI_SERVER_CREDENTIAL_ID }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # Para cotizaciones, cobros y emails (se suben si existen)
+          WHATSAPP_BUSINESS_ACCOUNT_ID: ${{ secrets.WHATSAPP_BUSINESS_ACCOUNT_ID }}
+          DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          QUOTE_PDF_SHARED_SECRET: ${{ secrets.QUOTE_PDF_SHARED_SECRET }}
+          # Ajustes opcionales (si no existen, el código usa su valor por defecto)
+          VAPI_ASSISTANT_MODEL_PROVIDER: ${{ secrets.VAPI_ASSISTANT_MODEL_PROVIDER }}
+          VAPI_ASSISTANT_MODEL: ${{ secrets.VAPI_ASSISTANT_MODEL }}
+          VAPI_VOICE_PROVIDER: ${{ secrets.VAPI_VOICE_PROVIDER }}
+          VAPI_VOICE_ID: ${{ secrets.VAPI_VOICE_ID }}
+          WHATSAPP_API_VERSION: ${{ secrets.WHATSAPP_API_VERSION }}
+          CALL_SUMMARY_MODEL: ${{ secrets.CALL_SUMMARY_MODEL }}
+          QUOTE_EXTRACTION_MODEL: ${{ secrets.QUOTE_EXTRACTION_MODEL }}
+          STRIPE_API_VERSION: ${{ secrets.STRIPE_API_VERSION }}
+        run: |
+          set -euo pipefail
+          CONNECTION="SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD"
+          REQUIRED="TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN VAPI_API_KEY VAPI_SERVER_SECRET
+            VAPI_SERVER_CREDENTIAL_ID WHATSAPP_ACCESS_TOKEN WHATSAPP_PHONE_NUMBER_ID
+            WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN ANTHROPIC_API_KEY CRON_SECRET"
+          LATER="WHATSAPP_BUSINESS_ACCOUNT_ID DEEPGRAM_API_KEY RESEND_API_KEY RESEND_FROM_EMAIL
+            STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_ID APP_BASE_URL
+            QUOTE_PDF_SHARED_SECRET"
+          TUNING="VAPI_ASSISTANT_MODEL_PROVIDER VAPI_ASSISTANT_MODEL VAPI_VOICE_PROVIDER
+            VAPI_VOICE_ID WHATSAPP_API_VERSION CALL_SUMMARY_MODEL QUOTE_EXTRACTION_MODEL
+            STRIPE_API_VERSION"
+
+          missing=()
+          for name in $CONNECTION $REQUIRED; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            {
+              echo "## ❌ No se desplegó nada"
+              echo
+              echo "Faltan estos secretos en GitHub (Settings → Secrets and variables → Actions):"
+              echo
+              for name in "${missing[@]}"; do echo "- \`$name\`"; done
+              echo
+              echo "Agrégalos y vuelve a correr el workflow. ENCENDIDO.md explica de dónde sale cada uno."
+            } >> "$GITHUB_STEP_SUMMARY"
+            for name in "${missing[@]}"; do
+              echo "::error title=Falta un secreto::Falta el secreto $name. No se desplegó nada."
+            done
+            exit 1
+          fi
+
+          if ! [[ "$SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{20}$ ]]; then
+            echo "::error title=SUPABASE_PROJECT_REF inválido::Debe ser solo el Project ID (20 letras y números, sin https:// ni .supabase.co). No se desplegó nada."
+            exit 1
+          fi
+
+          : > "$RUNNER_TEMP/supabase-functions.env"
+          chmod 600 "$RUNNER_TEMP/supabase-functions.env"
+          skipped=()
+          for name in $REQUIRED $LATER $TUNING; do
+            value="${!name:-}"
+            if [ -z "$value" ]; then skipped+=("$name"); continue; fi
+            if [[ "$value" == *"'"* || "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              echo "::error title=Secreto con formato inválido::El secreto $name tiene una comilla simple o un salto de línea. Vuelve a pegarlo sin eso. No se desplegó nada."
+              exit 1
+            fi
+            # Comillas simples: el lector de .env no expande $ dentro de ellas.
+            printf "%s='%s'\n" "$name" "$value" >> "$RUNNER_TEMP/supabase-functions.env"
+          done
+
+          {
+            echo "## ✅ Secretos completos para la primera llamada"
+            if [ "${#skipped[@]}" -gt 0 ]; then
+              echo
+              echo "Estos todavía no están (no bloquean la primera llamada, se suben cuando los agregues):"
+              echo
+              for name in "${skipped[@]}"; do echo "- \`$name\`"; done
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Pruebas y revisión de tipos (si fallan, no se despliega nada)
+        working-directory: supabase/functions
+        run: |
+          set -euo pipefail
+          deno task test
+          for name in $FUNCTIONS; do deno check "$name/index.ts"; done
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Conectar con el proyecto y aplicar migraciones
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          supabase link "$SUPABASE_PROJECT_REF"
+          supabase db push --remote --yes
+
+      - name: Subir los secretos de las Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase secrets set --env-file "$RUNNER_TEMP/supabase-functions.env" --yes
+
+      - name: Desplegar las 9 Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # config.toml ya trae verify_jwt = false para los 4 webhooks.
+          supabase functions deploy $FUNCTIONS --yes
+          echo "## 🚀 Listo: migraciones aplicadas, secretos subidos y 9 funciones desplegadas" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar el archivo temporal de secretos
+        if: always()
+        run: rm -f "$RUNNER_TEMP/supabase-functions.env"
