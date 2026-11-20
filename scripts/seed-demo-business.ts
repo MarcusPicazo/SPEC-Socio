@@ -6,9 +6,12 @@
 // DEMO_TWILIO_NUMBER is optional — leave it unset and assign the number later from
 // /admin once you've bought it in Twilio, same as any other business.
 //
-// Run with:
+// Run it from GitHub: Actions → "Sembrar negocio demo" → Run workflow
+// (.github/workflows/seed-demo-business.yml). Or, with a terminal:
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEMO_OWNER_WHATSAPP=+1... \
-//     deno run --allow-net --allow-env scripts/seed-demo-business.ts
+//     deno run --node-modules-dir=none --allow-net --allow-env scripts/seed-demo-business.ts
+// (--node-modules-dir=none: the repo root has a package.json, so without it
+// Deno 2 looks for npm packages in node_modules instead of downloading them.)
 
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4'
 import type { BusinessHours, BusinessService } from '../src/types.ts'
