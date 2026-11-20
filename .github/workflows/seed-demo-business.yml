@@ -1,0 +1,77 @@
+# Sembrar negocio demo: crea o actualiza "Martinez Roofing" (SPEC §4.1) con
+# scripts/seed-demo-business.ts. Es idempotente: correrlo otra vez actualiza
+# el mismo negocio, no crea uno duplicado. Requiere que "Desplegar Supabase"
+# ya haya aplicado las migraciones.
+
+name: Sembrar negocio demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      demo_owner_whatsapp:
+        description: 'DEMO_OWNER_WHATSAPP: tu WhatsApp, formato +1... o +52... (recibe los avisos)'
+        required: true
+        type: string
+      demo_twilio_number:
+        description: 'DEMO_TWILIO_NUMBER (opcional): número de Twilio del negocio, formato +1...'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    name: Crear o actualizar Martinez Roofing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revisar datos y secretos
+        env:
+          DEMO_OWNER_WHATSAPP: ${{ inputs.demo_owner_whatsapp }}
+          DEMO_TWILIO_NUMBER: ${{ inputs.demo_twilio_number }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          # Oculta los teléfonos en el log del run.
+          echo "::add-mask::$DEMO_OWNER_WHATSAPP"
+          if [ -n "$DEMO_TWILIO_NUMBER" ]; then echo "::add-mask::$DEMO_TWILIO_NUMBER"; fi
+
+          ok=true
+          for name in SUPABASE_PROJECT_REF SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Falta un secreto::Falta el secreto $name en GitHub (Settings → Secrets and variables → Actions)."
+              ok=false
+            fi
+          done
+          e164='^\+[1-9][0-9]{6,14}$'
+          if ! [[ "$DEMO_OWNER_WHATSAPP" =~ $e164 ]]; then
+            echo "::error title=WhatsApp inválido::DEMO_OWNER_WHATSAPP debe ir en formato internacional, por ejemplo +17135550123 (con +, sin espacios ni guiones)."
+            ok=false
+          fi
+          if [ -n "$DEMO_TWILIO_NUMBER" ] && ! [[ "$DEMO_TWILIO_NUMBER" =~ $e164 ]]; then
+            echo "::error title=Número de Twilio inválido::DEMO_TWILIO_NUMBER debe ir en formato +1..., sin espacios ni guiones."
+            ok=false
+          fi
+          [ "$ok" = true ] || exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Sembrar Martinez Roofing
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_OWNER_WHATSAPP: ${{ inputs.demo_owner_whatsapp }}
+          DEMO_TWILIO_NUMBER: ${{ inputs.demo_twilio_number }}
+        run: |
+          set -euo pipefail
+          deno run --node-modules-dir=none --allow-net --allow-env scripts/seed-demo-business.ts
+          {
+            echo "## 🏠 Martinez Roofing listo"
+            echo
+            echo "Abre /admin → Martinez Roofing → **Activar línea**."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,58 @@
+# Configurar Stripe: crea (o reutiliza) el producto "Socio Base" de $199/mes
+# con scripts/stripe-setup.ts e imprime SOLO el STRIPE_PRICE_ID. Es
+# idempotente: correrlo otra vez no duplica nada.
+
+name: Configurar Stripe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stripe:
+    name: Crear producto y precio
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revisar el secreto
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: |
+          if [ -z "$STRIPE_SECRET_KEY" ]; then
+            echo "::error title=Falta un secreto::Falta STRIPE_SECRET_KEY en GitHub (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Crear o reutilizar el precio
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_API_VERSION: ${{ secrets.STRIPE_API_VERSION }}
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/stripe-setup.log"
+          if ! deno run --node-modules-dir=none --allow-net --allow-env scripts/stripe-setup.ts > "$out" 2>&1; then
+            echo "::error title=Stripe falló::El script no pudo crear el precio. Revisa que STRIPE_SECRET_KEY sea una llave secreta válida (sk_test_... o sk_live_...)."
+            # Solo la última línea del error, sin el resto del log.
+            tail -n 1 "$out"
+            rm -f "$out"
+            exit 1
+          fi
+          line=$(grep -E '^STRIPE_PRICE_ID=price_[A-Za-z0-9]+$' "$out" | tail -n 1 || true)
+          rm -f "$out"
+          if [ -z "$line" ]; then
+            echo "::error title=Sin precio::El script terminó pero no imprimió un STRIPE_PRICE_ID."
+            exit 1
+          fi
+          echo "$line"
+          {
+            echo "## 💳 Copia esto como secreto STRIPE_PRICE_ID"
+            echo
+            echo "\`${line#STRIPE_PRICE_ID=}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
