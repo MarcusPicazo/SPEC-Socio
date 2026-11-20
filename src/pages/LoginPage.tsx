@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, type Location } from 'react-router-dom'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
 import { signInWithPassword, useAuth } from '../lib/auth'
 
 export function LoginPage() {
@@ -29,47 +31,40 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-      >
-        <h1 className="text-lg font-semibold text-gray-900">Panel de Socio</h1>
-        <p className="mt-1 text-sm text-gray-500">Entra con tu cuenta de operador.</p>
+    <div className="flex min-h-screen items-center justify-center bg-papel px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm border border-linea bg-superficie p-6">
+        <h1 className="text-[18px] font-medium text-tinta">Panel de Socio</h1>
+        <p className="mt-1 text-sm text-gris-texto">Entra con tu cuenta de operador.</p>
 
-        <label className="mt-4 block text-sm font-medium text-gray-700">
-          Correo
-          <input
+        <div className="mt-4">
+          <Input
+            label="Correo"
             type="email"
+            name="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
-        </label>
+        </div>
 
-        <label className="mt-3 block text-sm font-medium text-gray-700">
-          Contraseña
-          <input
+        <div className="mt-3">
+          <Input
+            label="Contraseña"
             type="password"
+            name="password"
             required
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
-        </label>
+        </div>
 
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-3 text-sm text-error">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-5 w-full rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={submitting} className="mt-5 w-full">
           {submitting ? 'Entrando…' : 'Entrar'}
-        </button>
+        </Button>
       </form>
     </div>
   )

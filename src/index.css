@@ -1,3 +1,69 @@
+/* BRAND-PANEL.md §4 — Geist / Geist Mono, servidas desde brand/fonts (sin
+   depender del paquete npm `geist`). */
+@font-face {
+  font-family: 'Geist';
+  src: url('./fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('./fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./fonts/GeistMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* BRAND-PANEL.md §3 — mismos tokens que tailwind.config.js, como variables
+   CSS para los pocos lugares que no pueden ser una clase de Tailwind
+   (por ejemplo, SocioLogo.tsx, que no se toca y lee sus propios hex). */
+:root {
+  --papel: #f3f1ec;
+  --superficie: #fbfaf7;
+  --tinta: #151514;
+  --arena: #bdb4a6;
+  --linea: #dcd6cc;
+  --gris-texto: #6b655c;
+  --apagado-oscuro: #3a3835;
+  --terracota: #c4472a;
+  --terracota-texto: #a83a20;
+  --exito: #2e6b47;
+  --exito-bg: #e3ede5;
+  --alerta: #8a5a0b;
+  --alerta-bg: #f3e9d2;
+  --error: #a1261b;
+  --error-bg: #f5e1dd;
+  --info: #2f5a8a;
+  --info-bg: #e1e8f1;
+}
+
+body {
+  background-color: var(--papel);
+  color: var(--tinta);
+  font-family: 'Geist', system-ui, sans-serif;
+}
+
+/* Foco visible en terracota en todo el panel — BRAND-PANEL.md §8. */
+:focus-visible {
+  outline: 2px solid var(--terracota);
+  outline-offset: 2px;
+}

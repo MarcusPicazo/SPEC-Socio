@@ -8,8 +8,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 export default [
   // supabase/functions and scripts/ run on Deno, a separate runtime with
   // its own globals and its own toolchain (deno lint/fmt) — not this
-  // project's browser-flavored ESLint config.
-  { ignores: ['dist', 'node_modules', 'supabase/functions', 'scripts'] },
+  // project's browser-flavored ESLint config. brand/ is the design kit
+  // (BRAND-PANEL.md, fonts, svgs, SocioLogo.tsx source) — reference
+  // material, not app code; the copy that's actually used lives under src/.
+  { ignores: ['dist', 'node_modules', 'supabase/functions', 'scripts', 'brand'] },
   js.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
