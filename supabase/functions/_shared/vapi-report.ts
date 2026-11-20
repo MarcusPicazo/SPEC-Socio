@@ -1,16 +1,13 @@
 // Extracts fields from Vapi's end-of-call-report server message.
 //
-// Vapi's own docs for this payload were unreachable while building this
-// (vapi.ai is blocked by this environment's network policy), and the
-// community threads that do describe it disagree on exact field names and
-// nesting (e.g. whether the dialed number sits at message.call.phoneNumber
-// vs message.phoneNumber, whether the recording URL is nested under
-// artifact.recording or a flatter artifact.recordingUrl). Rather than
-// guess one shape and fail silently on a real call, every field here tries
-// several plausible locations and falls back to null. voice-webhook also
-// logs the full raw payload to `events` on every delivery — use that to
-// check the real shape after a first test call and trim the fallbacks
-// that turned out to be unnecessary.
+// Checked against Vapi's docs on 2026-11-20 (docs.vapi.ai/server-url/events
+// and the ServerMessageEndOfCallReport schema in
+// docs.vapi.ai/api-reference/webhooks/server-message): the body is
+// { message: { type, endedReason, call, artifact, analysis, phoneNumber,
+// customer, assistant, startedAt, endedAt, ... } }. The documented locations
+// are tried first; the older fallbacks stay because they cost nothing.
+// voice-webhook still logs the full raw payload to `events` on every
+// delivery, so the first real call confirms the shape.
 
 export interface ExtractedCallFields {
   callId: string | null
@@ -53,6 +50,7 @@ export function extractCallFields(message: Record<string, unknown>): ExtractedCa
   const callPhoneNumber = asRecord(call.phoneNumber)
   const topPhoneNumber = asRecord(message.phoneNumber)
   const customer = asRecord(call.customer)
+  const topCustomer = asRecord(message.customer)
   const callAnalysis = asRecord(call.analysis)
   const topAnalysis = asRecord(message.analysis)
 
@@ -63,7 +61,7 @@ export function extractCallFields(message: Record<string, unknown>): ExtractedCa
     callId: asString(call.id) ?? asString(message.callId),
     assistantId: asString(call.assistantId) ?? asString(message.assistantId),
     dialedNumber: asString(callPhoneNumber.number) ?? asString(topPhoneNumber.number),
-    customerNumber: asString(customer.number),
+    customerNumber: asString(customer.number) ?? asString(topCustomer.number),
     transcript: asString(artifact.transcript) ?? asString(message.transcript),
     recordingUrl:
       asString(recording.stereoUrl) ??
@@ -73,7 +71,7 @@ export function extractCallFields(message: Record<string, unknown>): ExtractedCa
     startedAt,
     endedAt,
     durationSec: computeDurationSeconds(startedAt, endedAt),
-    structuredData: callAnalysis.structuredData ?? topAnalysis.structuredData ?? null,
+    structuredData: topAnalysis.structuredData ?? callAnalysis.structuredData ?? null,
     endedReason: asString(message.endedReason),
   }
 }
