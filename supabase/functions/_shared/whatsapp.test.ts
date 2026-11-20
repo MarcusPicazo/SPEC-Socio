@@ -82,3 +82,36 @@ Deno.test('isWithinWindow is false once 24h have passed', () => {
 Deno.test('isWithinWindow is false for an unparseable timestamp', () => {
   assertEquals(isWithinWindow('not a date', NOW), false)
 })
+
+Deno.test('buildTemplateComponents cleans a multi-line summary for the nueva_llamada template', () => {
+  // Outside the 24h window the call alert goes out as the nueva_llamada
+  // template; summary_es is usually 2–3 lines, which Meta rejects (132018).
+  const components = buildTemplateComponents(
+    [
+      'Sarah Miller',
+      'Gotera en el techo, entra agua en la recámara.\nUrgente.\n',
+      '+17135550142',
+      '4512 Oak St,\tHouston',
+      '',
+    ],
+    [{ payload: 'confirm:call-1' }, { payload: 'owner_call:call-1' }],
+  )
+
+  assertEquals(components[0], {
+    type: 'body',
+    parameters: [
+      { type: 'text', text: 'Sarah Miller' },
+      { type: 'text', text: 'Gotera en el techo, entra agua en la recámara. Urgente.' },
+      { type: 'text', text: '+17135550142' },
+      { type: 'text', text: '4512 Oak St, Houston' },
+      { type: 'text', text: '—' },
+    ],
+  })
+  // Button payloads are untouched — whatsapp-webhook matches them by prefix.
+  assertEquals(components[1], {
+    type: 'button',
+    sub_type: 'quick_reply',
+    index: 0,
+    parameters: [{ type: 'payload', payload: 'confirm:call-1' }],
+  })
+})
