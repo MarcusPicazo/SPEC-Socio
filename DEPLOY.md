@@ -1,5 +1,9 @@
 # DEPLOY.md — pasos exactos, en orden
 
+> **¿Sin terminal?** Sigue [`ENCENDIDO.md`](./ENCENDIDO.md): los mismos pasos desde
+> paneles web y GitHub, en orden hasta la primera llamada real, con el texto exacto de
+> las plantillas de WhatsApp y los hallazgos de la última revisión.
+
 Esto asume que ya tienes las cuentas de PROMPTS.md Día 0 (Meta, Supabase, Vercel,
 Twilio, Vapi, Anthropic, Deepgram, Resend, Stripe) y el proyecto de Supabase creado.
 
