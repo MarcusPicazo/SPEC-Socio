@@ -94,3 +94,32 @@ Deno.test('computeDurationSeconds returns null when the call ends before it star
 Deno.test('computeDurationSeconds rounds to the nearest second', () => {
   assertEquals(computeDurationSeconds('2026-10-08T15:00:00.000Z', '2026-10-08T15:00:01.600Z'), 2)
 })
+
+Deno.test('reads the documented end-of-call-report shape (top-level analysis, customer, phoneNumber)', () => {
+  // Shape from docs.vapi.ai/api-reference/webhooks/server-message
+  // (ServerMessageEndOfCallReport), checked 2026-11-20.
+  const message = {
+    type: 'end-of-call-report',
+    endedReason: 'customer-ended-call',
+    call: { id: 'call-doc', assistantId: 'assistant-doc' },
+    phoneNumber: { number: '+17135550100' },
+    customer: { number: '+17135550142' },
+    startedAt: '2026-11-20T15:00:00Z',
+    endedAt: '2026-11-20T15:01:00Z',
+    analysis: { structuredData: { caller_name: 'Sarah', is_spam: false } },
+    artifact: {
+      transcript: 'AI: Thanks for calling. User: My roof leaks.',
+      recording: { stereoUrl: 'https://example.com/stereo.wav' },
+    },
+  }
+
+  const result = extractCallFields(message)
+  assertEquals(result.callId, 'call-doc')
+  assertEquals(result.assistantId, 'assistant-doc')
+  assertEquals(result.dialedNumber, '+17135550100')
+  assertEquals(result.customerNumber, '+17135550142')
+  assertEquals(result.durationSec, 60)
+  assertEquals(result.structuredData, { caller_name: 'Sarah', is_spam: false })
+  assertEquals(result.recordingUrl, 'https://example.com/stereo.wav')
+  assertEquals(result.endedReason, 'customer-ended-call')
+})
