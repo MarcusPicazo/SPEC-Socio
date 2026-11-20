@@ -11,6 +11,17 @@ interface DeepgramResponse {
   }
 }
 
+/**
+ * Copies the bytes into a fresh ArrayBuffer-backed Uint8Array before
+ * wrapping them in a Blob. Since TS 5.7 / Deno 2.x, `Uint8Array` is generic
+ * over its buffer (`Uint8Array<ArrayBufferLike>` may be a SharedArrayBuffer),
+ * and `BlobPart` only accepts `ArrayBuffer`-backed views — passing `bytes`
+ * directly fails `deno check`. The copy is always `Uint8Array<ArrayBuffer>`.
+ */
+export function toBlob(bytes: Uint8Array): Blob {
+  return new Blob([new Uint8Array(bytes)])
+}
+
 export async function transcribeSpanish(bytes: Uint8Array, mimeType: string): Promise<string> {
   const apiKey = Deno.env.get('DEEPGRAM_API_KEY')
   if (!apiKey) throw new Error('Falta DEEPGRAM_API_KEY en el entorno de la función.')
@@ -22,12 +33,7 @@ export async function transcribeSpanish(bytes: Uint8Array, mimeType: string): Pr
       Authorization: `Token ${apiKey}`,
       'Content-Type': mimeType,
     },
-    // Wrapped in a Blob rather than passed as a raw Uint8Array: BodyInit's
-    // exact typed-array requirements have shifted across TS/lib versions
-    // (Uint8Array became generic over its buffer type), and Blob sidesteps
-    // the question entirely regardless of what `bytes`' generic parameter
-    // happens to be.
-    body: new Blob([bytes]),
+    body: toBlob(bytes),
   })
 
   const text = await response.text()

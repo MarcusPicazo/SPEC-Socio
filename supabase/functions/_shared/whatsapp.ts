@@ -10,6 +10,7 @@
 // - The send examples use Graph API v27.0.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
+import { sanitizeTemplateParam } from './template-params.ts'
 
 // Meta's current send-message examples use v27.0. Override with
 // WHATSAPP_API_VERSION if Meta deprecates it.
@@ -67,7 +68,11 @@ export function fromWhatsAppNumber(waNumber: string): string {
   return waNumber.startsWith('+') ? waNumber : `+${waNumber}`
 }
 
-/** Builds the template `components` array, omitting body/button parts that have nothing to send. */
+/**
+ * Builds the template `components` array, omitting body/button parts that
+ * have nothing to send. Body params are cleaned with sanitizeTemplateParam
+ * (no new lines, tabs or empty values), which Meta requires.
+ */
 export function buildTemplateComponents(
   bodyParams?: string[],
   buttonPayloads?: TemplateButtonPayload[],
@@ -77,7 +82,7 @@ export function buildTemplateComponents(
   if (bodyParams && bodyParams.length > 0) {
     components.push({
       type: 'body',
-      parameters: bodyParams.map((text) => ({ type: 'text', text })),
+      parameters: bodyParams.map((text) => ({ type: 'text', text: sanitizeTemplateParam(text) })),
     })
   }
 
