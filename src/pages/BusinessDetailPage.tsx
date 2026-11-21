@@ -7,6 +7,7 @@ import {
   SubscriptionStatusBadge,
   UrgencyBadge,
 } from '../components/ui/Badge'
+import { UsageCard } from '../components/UsageCard'
 import { CallBubble } from '../components/ui/CallBubble'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -23,7 +24,8 @@ import {
 } from '../lib/format'
 import { DAYS_OF_WEEK } from '../lib/validation/business'
 import { listRecentQuotesForBusiness, type QuoteWithCustomer } from '../lib/quotes'
-import type { Business } from '../types'
+import { listUsageEventsForBusiness, listUsagePeriodsForBusiness } from '../lib/usage'
+import type { Business, Event, UsagePeriod } from '../types'
 
 export function BusinessDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -31,6 +33,8 @@ export function BusinessDetailPage() {
   const [business, setBusiness] = useState<Business | null>(null)
   const [calls, setCalls] = useState<CallWithCustomer[]>([])
   const [quotes, setQuotes] = useState<QuoteWithCustomer[]>([])
+  const [latestPeriod, setLatestPeriod] = useState<UsagePeriod | null>(null)
+  const [usageEvents, setUsageEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [provisioning, setProvisioning] = useState(false)
@@ -46,12 +50,16 @@ export function BusinessDetailPage() {
       getBusiness(id),
       listRecentCallsForBusiness(id),
       listRecentQuotesForBusiness(id),
+      listUsagePeriodsForBusiness(id),
+      listUsageEventsForBusiness(id),
     ])
-      .then(([businessRow, callRows, quoteRows]) => {
+      .then(([businessRow, callRows, quoteRows, periodRows, eventRows]) => {
         if (!active) return
         setBusiness(businessRow)
         setCalls(callRows)
         setQuotes(quoteRows)
+        setLatestPeriod(periodRows[0] ?? null)
+        setUsageEvents(eventRows)
         setError(null)
       })
       .catch(() => {
@@ -177,6 +185,13 @@ export function BusinessDetailPage() {
           </p>
         )}
       </Card>
+
+      <UsageCard
+        business={business}
+        latestPeriod={latestPeriod}
+        events={usageEvents}
+        onBusinessChange={(patch) => setBusiness((current) => (current ? { ...current, ...patch } : current))}
+      />
 
       <Card title="Servicios">
         {business.services.length === 0 ? (

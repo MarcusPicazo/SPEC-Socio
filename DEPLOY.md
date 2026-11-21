@@ -83,6 +83,7 @@ npx supabase functions deploy quote-accept
 npx supabase functions deploy followups
 npx supabase functions deploy weekly-report
 npx supabase functions deploy billing-reminders
+npx supabase functions deploy operator-end-trial
 ```
 
 `supabase/config.toml` ya trae `verify_jwt = false` para las que lo necesitan — no

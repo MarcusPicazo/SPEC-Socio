@@ -17,6 +17,7 @@ import {
   handleSendQuoteRequest,
   SEND_QUOTE_BUTTON_PREFIX,
 } from '../_shared/quote-drafts.ts'
+import { endTrialNow } from '../_shared/end-trial.ts'
 import { isUniqueViolation } from '../_shared/postgrest-errors.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
@@ -26,6 +27,16 @@ import {
   parseInboundMessages,
   type InboundMessage,
 } from '../_shared/whatsapp-inbound.ts'
+import {
+  buildPlanStartedMessage,
+  PLAN_ALREADY_ACTIVE_MESSAGE,
+  PLAN_IN_PROGRESS_MESSAGE,
+  PLAN_NEEDS_CHECKOUT_MESSAGE,
+  PLAN_NOT_IN_TRIAL_MESSAGE,
+  PLAN_PAYMENT_FAILED_MESSAGE,
+  PLAN_START_ERROR_MESSAGE,
+  START_PLAN_BUTTON_PREFIX,
+} from '../_shared/usage.ts'
 import { fromWhatsAppNumber, sendFreeText, sendFreeTextUnassociated } from '../_shared/whatsapp.ts'
 
 // Statuses where quote_drafts is actively waiting on a free-text reply —
@@ -136,6 +147,44 @@ async function handleOwnerWillCall(
   })
 }
 
+/**
+ * "Empezar mi plan hoy" (tope_prueba). The tap itself is the owner's
+ * consent — the message said "Se cobran $199 USD hoy" — so this charges
+ * right away, no second confirmation (operator's decision, 2026-11-21).
+ * The business is always the sender's own, never the id in the payload,
+ * so a forwarded or edited payload can't charge someone else.
+ */
+async function handleStartPlan(admin: SupabaseClient, business: Business, replyTo: string): Promise<void> {
+  const result = await endTrialNow(admin, business, 'owner_button')
+
+  let body: string
+  switch (result.outcome) {
+    case 'charged':
+      body = buildPlanStartedMessage({ nextChargeAtIso: result.nextChargeAt, timeZone: business.timezone })
+      break
+    case 'already_active':
+      body = PLAN_ALREADY_ACTIVE_MESSAGE
+      break
+    case 'in_progress':
+      body = PLAN_IN_PROGRESS_MESSAGE
+      break
+    case 'no_subscription':
+      body = PLAN_NEEDS_CHECKOUT_MESSAGE
+      break
+    case 'payment_failed':
+      body = PLAN_PAYMENT_FAILED_MESSAGE
+      break
+    case 'not_trialing':
+      body = PLAN_NOT_IN_TRIAL_MESSAGE
+      break
+    case 'error':
+      body = PLAN_START_ERROR_MESSAGE
+      break
+  }
+
+  await sendFreeText(admin, { businessId: business.id, to: replyTo, body })
+}
+
 interface ClaimedMessage {
   business: Business
   fromE164: string
@@ -223,6 +272,10 @@ async function handleInboundMessage(
   }
   if (buttonAction?.payload.startsWith(OWNER_CALL_PREFIX)) {
     await handleOwnerWillCall(admin, business, buttonAction.payload.slice(OWNER_CALL_PREFIX.length), fromE164)
+    return
+  }
+  if (buttonAction?.payload.startsWith(START_PLAN_BUTTON_PREFIX)) {
+    await handleStartPlan(admin, business, fromE164)
     return
   }
   if (buttonAction?.payload.startsWith(CORRECT_QUOTE_BUTTON_PREFIX)) {

@@ -12,18 +12,19 @@ Vercel, y aprietas botones de GitHub Actions.
 
 ---
 
-## 0. Estado del código (revisión del 2026-11-20)
+## 0. Estado del código (revisión del 2026-11-21)
 
 | Revisión | Resultado |
 |---|---|
-| Pruebas de Edge Functions (`deno task test`, Deno 2.9.6) | ✅ **134 de 134 pasan** (también en una copia limpia sin `node_modules`, como en GitHub) |
-| `deno check` de las 9 Edge Functions | ✅ las 9 limpias (antes fallaba `whatsapp-webhook`) |
+| Pruebas de Edge Functions (`deno task test`, Deno 2.9.6) | ✅ **149 de 149 pasan** |
+| `deno check` de las 10 Edge Functions | ✅ las 10 limpias |
 | `npm run typecheck` y `typecheck:api` | ✅ sin errores |
 | `npm run lint` | ✅ 0 errores · 6 avisos menores (`react-refresh`) |
 | `npm run build` | ✅ compila |
 | Workflows de GitHub (`actionlint`) | ✅ sin errores |
-| `npm test` (vitest) | ❌ sigue intentando correr las pruebas de Deno (ver §9) |
-| Código vs. documentación de Vapi, Meta, Supabase y Twilio | ✅ revisado; lo que no coincidía ya está corregido (ver §8) |
+| `npm test` (vitest) | ✅ 9 de 9 pasan (ya solo corre las pruebas de `src/`) |
+| Pruebas SQL (`scripts/test-sql.sh`, Postgres 16 local) | ✅ conteo de minutos: no cuenta doble, segundos exactos, ciclo de prueba y ciclo pagado |
+| Código vs. documentación de Vapi, Meta, Supabase, Twilio y Stripe | ✅ revisado; lo que no coincidía ya está corregido (ver §8) |
 
 ---
 
@@ -34,11 +35,11 @@ Vercel, y aprietas botones de GitHub Actions.
 | 1 | Sacar las llaves | — | §2: Supabase, Twilio, Anthropic, Vapi, Meta | — |
 | 2 | Pegarlas en GitHub | Los workflows las leen | §3: una por una en *Secrets* | — |
 | 3 | Pegar 2 variables en Vercel | El frontend ya está desplegado | §4 | Redeploy automático al hacer push |
-| 4 | Tablas, secretos y funciones en Supabase | 16 migraciones, 9 funciones, `config.toml` | — | **Workflow "Desplegar Supabase"** (§5.1) |
+| 4 | Tablas, secretos y funciones en Supabase | 17 migraciones, 10 funciones, `config.toml` | — | **Workflow "Desplegar Supabase"** (§5.1) |
 | 5 | Vault para los cron jobs | Migraciones 13–15 | 3 líneas de SQL (§5.2) | — |
 | 6 | Tu usuario de `/admin` | Tabla `operators` | Crear el usuario y 1 línea de SQL (§5.3) | — |
 | 7 | Webhook de Meta | Verificación y firma | Pegar URL y token (§5.4) | — |
-| 8 | Plantilla `nueva_llamada` | Variables limpias y en orden | Registrarla (§5.5, texto en §7) | — |
+| 8 | Plantillas de WhatsApp | Variables limpias y en orden | Registrar `nueva_llamada` (§5.5) y después las demás (texto en §7) | — |
 | 9 | Crear Martinez Roofing | Script idempotente | — | **Workflow "Sembrar negocio demo"** (§5.6) |
 | 10 | Activar la línea | `provision-business` crea el asistente | Un clic en `/admin` (§5.7) | — |
 | 11 | Abrir la ventana de 24 h | Registra el mensaje | Mandar "Hola" (§5.8) | — |
@@ -226,15 +227,15 @@ botón **Run workflow** (derecha) → rama `main` → **Run workflow** verde.
 Hace, en este orden, y se detiene en el primer error:
 1. Revisa que estén los 14 secretos obligatorios. Si falta alguno, lo dice por nombre y
    **no toca nada**.
-2. Corre las 134 pruebas y revisa los tipos de las 9 funciones. Si algo falla, no despliega.
-3. Aplica las 16 migraciones (`supabase db push`).
+2. Corre las 149 pruebas y revisa los tipos de las 10 funciones. Si algo falla, no despliega.
+3. Aplica las 17 migraciones (`supabase db push`).
 4. Sube los secretos a Supabase (sin imprimirlos nunca).
-5. Despliega las 9 Edge Functions con `verify_jwt` de `config.toml`.
+5. Despliega las 10 Edge Functions con `verify_jwt` de `config.toml`.
 
 También corre **solo** cada vez que fusionas a `main` un cambio dentro de `supabase/`.
 
 **Cómo verificas:** el run sale en verde ✅ y su resumen dice "🚀 Listo". En Supabase →
-**Edge Functions** aparecen las 9.
+**Edge Functions** aparecen las 10.
 
 ⚠️ Si ya habías pegado migraciones a mano en el SQL Editor, `db push` va a intentar
 correrlas otra vez y puede fallar con "already exists". Pídele a Claude en la nube que
@@ -396,6 +397,32 @@ Ejemplos: Carlos · https://checkout.stripe.com/c/pay/cs_test_ejemplo
 ```
 Ejemplos: Carlos · vencida · https://billing.stripe.com/p/session/ejemplo
 
+**`aviso_minutos`**: aviso al dueño al 80 % de sus minutos (prueba o mes) y al 100 % del
+mes pagado. Sin botones.
+```
+⏳ Hola {{1}}, llevas {{2}} de {{3}} minutos {{4}}.
+{{5}}
+Cualquier duda, responde este mensaje.
+```
+Ejemplos: Carlos · 120 · 150 · de tu prueba · Tu línea sigue funcionando normal ✅
+
+(En el aviso del 100 % del mes, `{{4}}` es `de este mes` y `{{5}}` es
+`Tu línea sigue funcionando. Cada minuto extra cuesta $0.25 USD.`)
+
+**`tope_prueba`**: la prueba llegó a 150 minutos. Un botón de tipo **Quick reply**:
+`Empezar mi plan hoy`. Tocarlo cobra $199 USD ese mismo día (sin segunda confirmación).
+También se usa para el único recordatorio de 24 h si el dueño no responde.
+```
+🚦 Hola {{1}}, ya usaste {{2}} de tus 150 minutos de prueba. Tu línea sigue funcionando.
+
+Si quieres empezar tu plan, toca el botón. Se cobran $199 USD hoy y tu plan empieza ya, con 500 minutos al mes.
+```
+Ejemplos: Carlos · 150
+
+> Si Meta rechaza `aviso_minutos` porque `{{5}}` es una línea completa, cámbiala por una
+> frase fija (por ejemplo "Tu línea sigue funcionando.") y avísale a Claude para que el
+> código mande 4 variables en vez de 5.
+
 > Estos textos copian los mensajes libres que ya manda el código, para que el dueño lea
 > lo mismo dentro y fuera de la ventana de 24 h. Si Meta te pide cambiar una palabra,
 > no pasa nada mientras no cambie el **número ni el orden** de las variables.
@@ -410,6 +437,7 @@ Ejemplos: Carlos · vencida · https://billing.stripe.com/p/session/ejemplo
 | **WhatsApp Cloud API** | `developers.facebook.com/documentation/business-messaging/whatsapp/`: `messages/send-messages`, `messages/interactive-reply-buttons-messages`, `templates/overview`, `templates/components`, `webhooks/reference/messages/button` e `/interactive`; `docs/whatsapp/cloud-api/support/error-codes` | ✅ Ventana de 24 h: se reinicia con cada mensaje del dueño, como asume el código. ✅ Botones de respuesta: máximo 3, título ≤ 20 caracteres. ✅ Variables posicionales `{{1}}…`. ❌→✅ Graph API `v27.0` (los ejemplos ya no usan v26). ❌→✅ Variables de plantilla limpiadas (error 132018) |
 | **Supabase** | `supabase.com/docs/guides/functions/deploy`, `/functions/secrets`, `/functions/function-configuration`, `/deployment/managing-environments`, `/api/api-keys`, referencia de la CLI (`supabase.com/llms/cli.txt`) | ✅ `verify_jwt` en `config.toml`. ✅ GitHub Actions con `supabase/setup-cli@v1`. ✅ CLI v3: `supabase link <ref>`, `db push --remote --yes`, `secrets set --env-file`; `--project-ref` ya es obsoleto. ❌→✅ Si apagas las llaves legacy, las funciones usan `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS`. ✅ Los nombres de secretos no pueden empezar con `SUPABASE_` (no lo hacemos) |
 | **Twilio** | `twilio.com/docs/usage/tutorials/how-to-use-your-free-trial-account` | ✅ Confirma que hay que pasar a pago: con cuenta de prueba solo llaman números verificados |
+| **Stripe** (2026-11-21) | `docs.stripe.com/billing/subscriptions/trials/free-trials`, `/billing/subscriptions/trials/compare`, `/billing/subscriptions/trials`, `/billing/subscriptions/change-price`, `/billing/subscriptions/billing-mode/compare`, `/billing/subscriptions/usage-based-legacy/pricing-models` | ✅ Checkout ya pedía tarjeta (`payment_method_collection` es `always` por defecto); ahora está explícito, y si la prueba termina sin tarjeta, se cancela (`missing_payment_method: 'cancel'`). ✅ 14 días con `trial_period_days`: el primer cobro cae el día 15. ✅ `trial_end: 'now'` termina la prueba y Stripe cobra en ese momento; si la tarjeta falla, queda `past_due`. ✅ Las fechas del ciclo ahora vienen en `items.data[0].current_period_*`. ⏳ Minutos extra: Stripe no cobra el uso de la prueba; el cobro se hará con un precio medido por escalones (ver §9) |
 
 ---
 
@@ -427,11 +455,19 @@ Ejemplos: Carlos · vencida · https://billing.stripe.com/p/session/ejemplo
    *structured outputs* (`artifactPlan.structuredOutputIds`). Migrar es una tarea
    aparte: hay que crear el *structured output* en Vapi y leer
    `artifact.structuredOutputs`.
-4. **`npm test` en rojo.** vitest recoge las pruebas de Deno; hay que excluir
-   `supabase/functions` en su configuración.
-5. **Despliegue parcial.** Si una de las 9 funciones falla al desplegarse, las anteriores
+4. **Cobro de minutos extra ($0.25 USD por minuto).** Hoy solo se cuentan y se le avisan
+   al dueño; todavía no se cobran. La propuesta para la siguiente tarea: un segundo precio
+   medido en la misma suscripción, por escalones (de 0 a 500 minutos a $0, del 501 en adelante a $0.25), y un evento de uso
+   por llamada con el ID de la llamada para que no se cobre doble.
+5. **Despliegue parcial.** Si una de las 10 funciones falla al desplegarse, las anteriores
    ya quedaron arriba. El workflow corre pruebas y `deno check` antes, para que eso sea
    muy raro.
 6. **La transferencia de emergencias marca al `owner_whatsapp`.** Si algún dueño usa
    WhatsApp en otro número, hace falta un campo aparte.
 7. **Lint:** 6 avisos cosméticos de `react-refresh`.
+8. **Avisos de minutos que fallan por WhatsApp no se reintentan.** El aviso del 80 % o del
+   100 % se marca como enviado antes de mandarlo, para que nunca llegue doble. Si WhatsApp
+   falla (por ejemplo, la plantilla todavía no está aprobada), queda en `events` con
+   `whatsapp_sent: false` y se ve en la ficha del negocio en `/admin`.
+9. **Confirmación cuando el operador termina la prueba.** Se manda como texto libre. Si la
+   ventana de 24 h está cerrada no llega, y `/admin` te avisa para que le escribas tú.

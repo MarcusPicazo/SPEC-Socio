@@ -5,16 +5,24 @@
 // which would start a SECOND subscription instead of fixing the existing
 // one). Reminders repeat at most once a week while the problem persists,
 // via the same events-based idempotency as weekly-report.
+//
+// Also: a trial that hit 150 minutes and whose owner hasn't tapped
+// "Empezar mi plan hoy" after 24 hours gets the same tope_prueba message
+// once more — only once per decision. The line is never cut; the operator
+// decides in /admin.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4'
 import { verifyCronSecret } from '../_shared/cron-auth.ts'
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import { createStripeClient } from '../_shared/stripe.ts'
 import type { Business } from '../_shared/types.ts'
+import { billedMinutes } from '../_shared/usage.ts'
+import { sendTrialCapMessage } from '../_shared/usage-tracking.ts'
 import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
 import { PAGO_PENDIENTE_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 const STATUS_LABEL_ES: Record<string, string> = {
   past_due: 'vencida',
@@ -106,6 +114,49 @@ async function sendReminder(admin: SupabaseClient, business: Business): Promise<
   })
 }
 
+async function fetchUndecidedTrialCaps(admin: SupabaseClient): Promise<Business[]> {
+  const oneDayAgo = new Date(Date.now() - ONE_DAY_MS).toISOString()
+  const { data, error } = await admin
+    .from('businesses')
+    .select('*')
+    .eq('subscription_status', 'trialing')
+    .eq('trial_cap_status', 'pending_decision')
+    .lte('trial_cap_status_since', oneDayAgo)
+  if (error) throw error
+  return (data ?? []) as Business[]
+}
+
+async function trialCapReminderAlreadySent(admin: SupabaseClient, business: Business): Promise<boolean> {
+  const { data } = await admin
+    .from('events')
+    .select('id')
+    .eq('business_id', business.id)
+    .eq('type', 'usage.trial_cap_reminder_sent')
+    .gte('created_at', business.trial_cap_status_since ?? business.created_at)
+    .limit(1)
+    .maybeSingle()
+  return Boolean(data)
+}
+
+async function sendTrialCapReminder(admin: SupabaseClient, business: Business): Promise<void> {
+  const { data: period } = await admin
+    .from('usage_periods')
+    .select('used_seconds')
+    .eq('business_id', business.id)
+    .eq('kind', 'trial')
+    .order('period_start', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const usedMinutes = billedMinutes(Number(period?.used_seconds ?? 0))
+
+  const result = await sendTrialCapMessage(admin, business, usedMinutes)
+  await admin.from('events').insert({
+    business_id: business.id,
+    type: 'usage.trial_cap_reminder_sent',
+    payload: { used_minutes: usedMinutes, whatsapp_sent: result.success, whatsapp_error: result.error },
+  })
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Método no permitido.' }, 405)
   if (!verifyCronSecret(req)) return jsonResponse({ error: 'Secreto inválido.' }, 401)
@@ -125,5 +176,21 @@ Deno.serve(async (req: Request) => {
     sent++
   }
 
-  return jsonResponse({ ok: true, overdue: businesses.length, sent, skipped_already_reminded: skippedAlreadyReminded }, 200)
+  let trialCapReminders = 0
+  for (const business of await fetchUndecidedTrialCaps(admin)) {
+    if (await trialCapReminderAlreadySent(admin, business)) continue
+    await sendTrialCapReminder(admin, business)
+    trialCapReminders++
+  }
+
+  return jsonResponse(
+    {
+      ok: true,
+      overdue: businesses.length,
+      sent,
+      skipped_already_reminded: skippedAlreadyReminded,
+      trial_cap_reminders: trialCapReminders,
+    },
+    200,
+  )
 })
