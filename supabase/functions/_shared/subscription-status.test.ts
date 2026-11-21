@@ -1,5 +1,5 @@
 import { assertEquals } from 'jsr:@std/assert@1'
-import { mapStripeSubscriptionStatus, stripeTimestampToIso } from './subscription-status.ts'
+import { mapStripeSubscriptionStatus, stripeTimestampToIso, subscriptionCurrentPeriod } from './subscription-status.ts'
 
 Deno.test('mapStripeSubscriptionStatus maps the statuses our enum has directly', () => {
   assertEquals(mapStripeSubscriptionStatus('trialing'), 'trialing')
@@ -26,4 +26,15 @@ Deno.test('stripeTimestampToIso converts Unix seconds to an ISO string', () => {
 Deno.test('stripeTimestampToIso returns null for null or undefined', () => {
   assertEquals(stripeTimestampToIso(null), null)
   assertEquals(stripeTimestampToIso(undefined), null)
+})
+
+Deno.test('subscriptionCurrentPeriod reads the dates from the first subscription item', () => {
+  assertEquals(
+    subscriptionCurrentPeriod({ items: { data: [{ current_period_start: 1795219200, current_period_end: 1797811200 }] } }),
+    { start: '2026-11-21T00:00:00.000Z', end: '2026-12-21T00:00:00.000Z' },
+  )
+})
+
+Deno.test('subscriptionCurrentPeriod returns nulls when there are no items', () => {
+  assertEquals(subscriptionCurrentPeriod({ items: { data: [] } }), { start: null, end: null })
 })

@@ -25,7 +25,12 @@ function demoBusiness(overrides: Partial<Business> = {}): Business {
     subscription_status: 'trialing',
     subscription_status_since: '2026-11-01T00:00:00Z',
     stripe_customer_id: null,
+    stripe_subscription_id: null,
     trial_ends_at: null,
+    billing_period_start: null,
+    billing_period_end: null,
+    trial_cap_status: 'none',
+    trial_cap_status_since: null,
     created_at: '2026-11-01T00:00:00Z',
     ...overrides,
   }

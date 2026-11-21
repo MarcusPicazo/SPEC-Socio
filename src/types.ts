@@ -4,6 +4,18 @@
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled'
 
+/** Where the "trial hit 150 minutes" decision stands. Nothing ever cuts the line. */
+export type TrialCapStatus =
+  | 'none'
+  | 'pending_decision'
+  | 'owner_started_plan'
+  | 'operator_ended_trial'
+  | 'operator_continue'
+
+export type UsagePeriodKind = 'trial' | 'paid'
+
+export type UsageAlertLevel = 80 | 100 | 200
+
 export type Language = 'en' | 'es'
 
 export type CallStatus = 'new' | 'confirmed' | 'owner_will_call' | 'ignored'
@@ -41,8 +53,30 @@ export interface Business {
   subscription_status: SubscriptionStatus
   subscription_status_since: string
   stripe_customer_id: string | null
+  stripe_subscription_id: string | null
   trial_ends_at: string | null
+  billing_period_start: string | null
+  billing_period_end: string | null
+  trial_cap_status: TrialCapStatus
+  trial_cap_status_since: string | null
   created_at: string
+}
+
+/** One billing cycle's call minutes (migration 20261008000017). */
+export interface UsagePeriod {
+  id: string
+  business_id: string
+  kind: UsagePeriodKind
+  period_start: string
+  period_end: string | null
+  included_minutes: number
+  /** Exact seconds; minutes = ceil(used_seconds / 60) for the whole cycle. */
+  used_seconds: number
+  alert_80_sent_at: string | null
+  alert_100_sent_at: string | null
+  alert_200_sent_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Operator {
@@ -95,6 +129,7 @@ export interface Call {
   summary_es: string | null
   is_spam: boolean
   status: CallStatus
+  usage_period_id: string | null
   created_at: string
 }
 

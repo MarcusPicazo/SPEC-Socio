@@ -84,12 +84,20 @@ Deno.serve(async (req: Request) => {
       await admin.from('businesses').update({ stripe_customer_id: stripeCustomerId }).eq('id', typedBusiness.id)
     }
 
+    // Card required up front ('always' is Stripe's default for subscription
+    // mode; set explicitly so nobody flips it by accident). The 14-day
+    // trial starts when the owner completes Checkout, so the first $199
+    // charge lands on day 15; canceling before that charges nothing. If the
+    // trial somehow ends with no payment method, cancel rather than bill.
+    // docs.stripe.com/billing/subscriptions/trials/free-trials (2026-11-21).
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
+      payment_method_collection: 'always',
       subscription_data: {
         trial_period_days: TRIAL_PERIOD_DAYS,
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
         metadata: { business_id: typedBusiness.id },
       },
       client_reference_id: typedBusiness.id,
