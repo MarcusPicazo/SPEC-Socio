@@ -3,7 +3,9 @@
 // see _shared/stripe.ts), is idempotent on the event id (same pattern as
 // every other provider id in this project: calls.provider_call_id,
 // messages.provider_message_id — here events.provider_event_id), and
-// updates subscription_status/trial_ends_at/subscription_status_since.
+// updates subscription_status/trial_ends_at/subscription_status_since,
+// plus the subscription id and the current billing cycle's dates — the
+// cycle that call minutes are counted against (500 included per cycle).
 //
 // Deliberately only listens to customer.subscription.* — those events
 // carry the subscription's .status directly, so there's no need to also
@@ -13,7 +15,11 @@
 
 import { createAdminClient } from '../_shared/supabase-admin.ts'
 import { createStripeClient, verifyStripeWebhook, type Stripe } from '../_shared/stripe.ts'
-import { mapStripeSubscriptionStatus, stripeTimestampToIso } from '../_shared/subscription-status.ts'
+import {
+  mapStripeSubscriptionStatus,
+  stripeTimestampToIso,
+  subscriptionCurrentPeriod,
+} from '../_shared/subscription-status.ts'
 import type { Business } from '../_shared/types.ts'
 
 const SUBSCRIPTION_EVENT_TYPES = new Set([
@@ -101,9 +107,13 @@ Deno.serve(async (req: Request) => {
   }
 
   const statusChanged = mappedStatus !== business.subscription_status
+  const period = subscriptionCurrentPeriod(subscription)
   const patch: Record<string, unknown> = {
     subscription_status: mappedStatus,
     trial_ends_at: stripeTimestampToIso(subscription.trial_end),
+    stripe_subscription_id: subscription.id,
+    billing_period_start: period.start,
+    billing_period_end: period.end,
   }
   if (statusChanged) patch.subscription_status_since = new Date().toISOString()
 
@@ -117,6 +127,8 @@ Deno.serve(async (req: Request) => {
       stripe_status: subscription.status,
       mapped_status: mappedStatus,
       status_changed: statusChanged,
+      billing_period_start: period.start,
+      billing_period_end: period.end,
     },
     provider_event_id: event.id,
   })

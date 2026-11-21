@@ -55,8 +55,9 @@ supabase/
     quote-accept/             Botón Accept de la página pública
     followups/                Recordatorio a los 3 días (cron)
     weekly-report/            Reporte semanal al dueño (cron)
-    billing-reminders/        Aviso de pago atrasado (cron)
-scripts/                   Scripts de un solo uso (setup de Stripe, seed del negocio demo)
+    billing-reminders/        Aviso de pago atrasado y recordatorio del tope de prueba (cron)
+    operator-end-trial/       Botón de /admin: terminar la prueba y cobrar hoy
+scripts/                   Scripts de un solo uso (setup de Stripe, seed del negocio demo, pruebas SQL)
 ```
 
 ## Documentación

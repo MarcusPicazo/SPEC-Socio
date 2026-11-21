@@ -30,3 +30,19 @@ export function stripeTimestampToIso(unixSeconds: number | null | undefined): st
   if (unixSeconds === null || unixSeconds === undefined) return null
   return new Date(unixSeconds * 1000).toISOString()
 }
+
+/**
+ * The subscription's current billing cycle. Since Stripe API 2025-03-31
+ * the period dates live on each subscription item, not on the
+ * subscription — Socio has a single item (the $199 plan), so its dates
+ * are the cycle's.
+ */
+export function subscriptionCurrentPeriod(subscription: {
+  items: { data: Array<{ current_period_start?: number | null; current_period_end?: number | null }> }
+}): { start: string | null; end: string | null } {
+  const item = subscription.items.data[0]
+  return {
+    start: stripeTimestampToIso(item?.current_period_start),
+    end: stripeTimestampToIso(item?.current_period_end),
+  }
+}
