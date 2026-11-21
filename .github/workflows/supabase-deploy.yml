@@ -39,6 +39,7 @@ jobs:
       FUNCTIONS: >-
         voice-webhook whatsapp-webhook provision-business create-checkout-link
         stripe-webhook quote-accept followups weekly-report billing-reminders
+        operator-end-trial
 
     steps:
       - name: Revisar que estén todos los secretos

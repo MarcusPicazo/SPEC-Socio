@@ -46,3 +46,19 @@ export const PAGO_PENDIENTE_TEMPLATE = {
   // portal de facturación de Stripe.
   bodyParamCount: 3,
 }
+
+export const AVISO_MINUTOS_TEMPLATE = {
+  name: 'aviso_minutos',
+  // {{1}} nombre del dueño, {{2}} minutos usados, {{3}} minutos incluidos,
+  // {{4}} "de tu prueba" o "de este mes", {{5}} frase de cierre (línea
+  // sigue funcionando / precio del minuto extra). Ver _shared/usage.ts.
+  bodyParamCount: 5,
+}
+
+export const TOPE_PRUEBA_TEMPLATE = {
+  name: 'tope_prueba',
+  // {{1}} nombre del dueño, {{2}} minutos usados. Botón quick reply con
+  // payload start_plan:<business_id> — tocarlo cobra $199 USD ese día.
+  bodyParamCount: 2,
+  buttons: ['Empezar mi plan hoy'] as const,
+}

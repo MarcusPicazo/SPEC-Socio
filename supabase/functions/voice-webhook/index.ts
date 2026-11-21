@@ -3,7 +3,9 @@
 // - is idempotent on provider_call_id (Vapi can redeliver),
 // - finds the business, saves the call, and creates/updates the customer,
 // - stops there if the call was spam,
-// - otherwise generates summary_es with Claude Haiku and saves it too.
+// - otherwise generates summary_es with Claude Haiku and saves it too,
+// - counts the call's minutes (spam included) and sends the 80 %/100 %
+//   alerts — after the call summary, so the owner reads about the call first.
 //
 // Every delivery is logged in full to `events` — vapi-report.ts follows
 // Vapi's documented shape, and that log confirms it on the first real call.
@@ -17,6 +19,7 @@ import { CALL_SUMMARY_PROMPT } from '../_shared/prompts/call-summary.ts'
 import { fillTemplate } from '../_shared/template.ts'
 import type { Business, CallExtraction } from '../_shared/types.ts'
 import { isUniqueViolation } from '../_shared/postgrest-errors.ts'
+import { recordCallUsage } from '../_shared/usage-tracking.ts'
 import { extractCallFields, type ExtractedCallFields } from '../_shared/vapi-report.ts'
 import { sendTemplateOrFreeText } from '../_shared/whatsapp.ts'
 import { NUEVA_LLAMADA_TEMPLATE, TEMPLATE_LANGUAGE } from '../_shared/whatsapp-templates.ts'
@@ -205,6 +208,24 @@ async function notifyOwnerOfNewCall(
   return { success: result.success, error: result.error }
 }
 
+/**
+ * Minute counting must never break the call flow (momento 1 comes first),
+ * so a failure here is logged to `events` instead of thrown. It's safe to
+ * run again on a redelivered webhook — see _shared/usage-tracking.ts.
+ */
+async function countCallMinutes(admin: SupabaseClient, business: Business, callRowId: string): Promise<void> {
+  try {
+    await recordCallUsage(admin, business, callRowId)
+  } catch (error) {
+    console.error('No se pudieron contar los minutos de la llamada', callRowId, error)
+    await admin.from('events').insert({
+      business_id: business.id,
+      type: 'usage.record_failed',
+      payload: { call_row_id: callRowId, error: error instanceof Error ? error.message : String(error) },
+    })
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Método no permitido.' }, 405)
 
@@ -301,7 +322,18 @@ Deno.serve(async (req: Request) => {
     .single()
 
   if (claimError) {
-    if (isUniqueViolation(claimError)) return jsonResponse({ ok: true, duplicate: true }, 200)
+    if (isUniqueViolation(claimError)) {
+      // Already saved by an earlier delivery. Counting is idempotent, so
+      // retry it — it finishes the job if that earlier delivery crashed
+      // before counting, and adds nothing otherwise.
+      const { data: existingCall } = await admin
+        .from('calls')
+        .select('id')
+        .eq('provider_call_id', fields.callId)
+        .maybeSingle()
+      if (existingCall) await countCallMinutes(admin, business, existingCall.id as string)
+      return jsonResponse({ ok: true, duplicate: true }, 200)
+    }
     throw claimError
   }
 
@@ -322,6 +354,8 @@ Deno.serve(async (req: Request) => {
       payload: { call_id: fields.callId },
     })
 
+    // Spam still used Vapi minutes, so it counts.
+    await countCallMinutes(admin, business, claimedCall.id)
     return jsonResponse({ ok: true, spam: true }, 200)
   }
 
@@ -362,6 +396,8 @@ Deno.serve(async (req: Request) => {
       whatsapp_error: notification.error,
     },
   })
+
+  await countCallMinutes(admin, business, claimedCall.id)
 
   return jsonResponse({ ok: true }, 200)
 })
